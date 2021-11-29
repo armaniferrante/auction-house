@@ -640,4 +640,39 @@ describe('auction-house', () => {
     );
     console.log('txSig:', txSig);
   });
+
+  it('Updates an auction house', async () => {
+    const sellerFeeBasisPoints = 2;
+    const requiresSignOff = true;
+    const canChangeSalePrice = null;
+    const tx = new Transaction();
+    tx.add(
+       authorityClient.instruction.updateAuctionHouse(
+        sellerFeeBasisPoints,
+        requiresSignOff,
+        canChangeSalePrice,
+        {
+          accounts: {
+            treasuryMint,
+            payer: authority,
+            authority,
+            newAuthority: authority,
+            feeWithdrawalDestination,
+            treasuryWithdrawalDestination,
+            treasuryWithdrawalDestinationOwner,
+            auctionHouse,
+            tokenProgram,
+            systemProgram,
+            ataProgram,
+            rent,
+          }
+        }
+      )
+    );
+    const txSig = await authorityClient.provider.send(tx);
+    console.log('updateAuctionHouse:', txSig);
+
+    const newAh = await authorityClient.account.auctionHouse.fetch(auctionHouse);
+    assert.ok(newAh.sellerFeeBasisPoints === 2);
+  });
 });
