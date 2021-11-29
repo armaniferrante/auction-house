@@ -517,6 +517,7 @@ describe('auction-house', () => {
   it('Executes a trades', async () => {
     // Before state.
     const beforeEscrowState = await authorityClient.provider.connection.getAccountInfo(buyerEscrow);
+    const beforeSeller = await authorityClient.provider.connection.getAccountInfo(sellerWallet.publicKey);
 
     // Execute trade.
     const buyerPrice = new u64(2*10**9);
@@ -597,9 +598,46 @@ describe('auction-house', () => {
 
     // After state.
     const afterEscrowState = await authorityClient.provider.connection.getAccountInfo(buyerEscrow);
+    const afterSeller = await authorityClient.provider.connection.getAccountInfo(sellerWallet.publicKey);
+
 
     // Assertions.
     assert.ok(afterEscrowState === null);
     assert.ok(beforeEscrowState.lamports === 2*10**9);
+    assert.ok(1999800000.0 === afterSeller.lamports-beforeSeller.lamports); // 1bp fee.
+  });
+
+  it('Withdraws from the fee account', async () => {
+    const txSig = await authorityClient.rpc.withdrawFromFee(
+      new u64(1),
+      {
+        accounts: {
+          authority,
+          feeWithdrawalDestination,
+          auctionHouseFeeAccount,
+          auctionHouse,
+          systemProgram,
+        },
+      }
+    );
+    console.log('withdrawFromFee:', txSig);
+  });
+
+  it('Withdraws from the treasury account', async () => {
+    const txSig = await authorityClient.rpc.withdrawFromTreasury(
+      new u64(1),
+      {
+        accounts: {
+          treasuryMint,
+          authority,
+          treasuryWithdrawalDestination,
+          auctionHouseTreasury,
+          auctionHouse,
+          tokenProgram,
+          systemProgram,
+        }
+      },
+    );
+    console.log('txSig:', txSig);
   });
 });
