@@ -1,3 +1,4 @@
+import * as assert from 'assert';
 import * as anchor from '@project-serum/anchor';
 import { Provider, Program, Wallet, BN, getProvider } from '@project-serum/anchor';
 import {
@@ -15,7 +16,6 @@ import {
 } from '@solana/spl-token';
 import * as metaplex from '@metaplex/js';
 import { IDL, AuctionHouse } from '../target/types/auction_house';
-
 const MetadataDataData = metaplex.programs.metadata.MetadataDataData;
 const CreateMetadata = metaplex.programs.metadata.CreateMetadata;
 
@@ -317,7 +317,7 @@ describe('auction-house', () => {
   });
 
   it('Posts an offer', async () => {
-    const buyerPrice = new u64(2);
+    const buyerPrice = new u64(2*10**9);
     const tokenSize = new u64(1);
     const zero = new u64(0);
     const [sellerTradeState, sellerTradeStateBump] = await PublicKey.findProgramAddress(
@@ -375,7 +375,7 @@ describe('auction-house', () => {
   });
 
   it('Cancels an offer', async () => {
-    const buyerPrice = new u64(2);
+    const buyerPrice = new u64(2*10**9);
     const tokenSize = new u64(1);
     const [tradeState] = await PublicKey.findProgramAddress(
       [
@@ -411,8 +411,66 @@ describe('auction-house', () => {
     console.log('cancel:', txSig);
   });
 
+  it('Posts an offer (again)', async () => {
+    const buyerPrice = new u64(2*10**9);
+    const tokenSize = new u64(1);
+    const zero = new u64(0);
+    const [sellerTradeState, sellerTradeStateBump] = await PublicKey.findProgramAddress(
+      [
+        PREFIX,
+        sellerWallet.publicKey.toBuffer(),
+        auctionHouse.toBuffer(),
+        sellerTokenAccount.toBuffer(),
+        treasuryMint.toBuffer(),
+        nftMintClient.publicKey.toBuffer(),
+        buyerPrice.toBuffer(),
+        tokenSize.toBuffer(),
+      ],
+      AUCTION_HOUSE_PROGRAM_ID,
+    );
+    const [freeSellerTradeState, freeSellerTradeStateBump] = await PublicKey.findProgramAddress(
+      [
+        PREFIX,
+        sellerWallet.publicKey.toBuffer(),
+        auctionHouse.toBuffer(),
+        sellerTokenAccount.toBuffer(),
+        treasuryMint.toBuffer(),
+        nftMintClient.publicKey.toBuffer(),
+        zero.toBuffer(),
+        tokenSize.toBuffer(),
+      ],
+      AUCTION_HOUSE_PROGRAM_ID,
+    );
+    const txSig = await sellerClient.rpc.sell(
+      sellerTradeStateBump,
+      freeSellerTradeStateBump,
+      programAsSignerBump,
+      buyerPrice,
+      tokenSize,
+      {
+        accounts: {
+          wallet: sellerWallet.publicKey,
+          tokenAccount: sellerTokenAccount,
+          metadata,
+          authority,
+          auctionHouse,
+          auctionHouseFeeAccount,
+          sellerTradeState,
+          freeSellerTradeState,
+          tokenProgram,
+          systemProgram,
+          programAsSigner,
+          rent,
+        },
+      // @ts-ignore
+      signers: [authorityClient.provider.wallet.payer],
+      },
+    );
+    console.log('sell:', txSig);
+  });
+
   it('Posts a bid', async () => {
-    const buyerPrice = new u64(2);
+    const buyerPrice = new u64(2*10**9);
     const tokenSize = new u64(1);
     const [buyerTradeState, buyerTradeStateBump] = await PublicKey.findProgramAddress(
       [
@@ -454,5 +512,94 @@ describe('auction-house', () => {
       },
     );
     console.log('buy:', txSig);
+  });
+
+  it('Executes a trades', async () => {
+    // Before state.
+    const beforeEscrowState = await authorityClient.provider.connection.getAccountInfo(buyerEscrow);
+
+    // Execute trade.
+    const buyerPrice = new u64(2*10**9);
+    const tokenSize = new u64(1);
+    const zero = new u64(0);
+    const [buyerTradeState, buyerTradeStateBump] = await PublicKey.findProgramAddress(
+      [
+        PREFIX,
+        buyerWallet.publicKey.toBuffer(),
+        auctionHouse.toBuffer(),
+        sellerTokenAccount.toBuffer(),
+        treasuryMint.toBuffer(),
+        nftMintClient.publicKey.toBuffer(),
+        buyerPrice.toBuffer(),
+        tokenSize.toBuffer(),
+      ],
+      AUCTION_HOUSE_PROGRAM_ID,
+    );
+    const [sellerTradeState] = await PublicKey.findProgramAddress(
+      [
+        PREFIX,
+        sellerWallet.publicKey.toBuffer(),
+        auctionHouse.toBuffer(),
+        sellerTokenAccount.toBuffer(),
+        treasuryMint.toBuffer(),
+        nftMintClient.publicKey.toBuffer(),
+        buyerPrice.toBuffer(),
+        tokenSize.toBuffer(),
+      ],
+      AUCTION_HOUSE_PROGRAM_ID,
+    );
+    const [freeSellerTradeState, freeSellerTradeStateBump] = await PublicKey.findProgramAddress(
+      [
+        PREFIX,
+        sellerWallet.publicKey.toBuffer(),
+        auctionHouse.toBuffer(),
+        sellerTokenAccount.toBuffer(),
+        treasuryMint.toBuffer(),
+        nftMintClient.publicKey.toBuffer(),
+        zero.toBuffer(),
+        tokenSize.toBuffer(),
+      ],
+      AUCTION_HOUSE_PROGRAM_ID,
+    );
+    const txSig = await authorityClient.rpc.executeSale(
+      buyerEscrowBump,
+      freeSellerTradeStateBump,
+      programAsSignerBump,
+      buyerPrice,
+      tokenSize,
+      {
+        accounts: {
+          buyer: buyerWallet.publicKey,
+          seller: sellerWallet.publicKey,
+          tokenAccount: sellerTokenAccount,
+          tokenMint: nftMintClient.publicKey,
+          metadata,
+          treasuryMint,
+          escrowPaymentAccount: buyerEscrow,
+          sellerPaymentReceiptAccount: sellerWallet.publicKey,
+          buyerReceiptTokenAccount: buyerTokenAccount,
+          authority,
+          auctionHouse,
+          auctionHouseFeeAccount,
+          auctionHouseTreasury,
+          buyerTradeState,
+          sellerTradeState,
+          freeTradeState: freeSellerTradeState,
+          tokenProgram,
+          systemProgram,
+          ataProgram,
+          programAsSigner,
+          rent,
+        },
+      }
+    );
+    console.log('executeSale:', txSig);
+
+    // After state.
+    const afterEscrowState = await authorityClient.provider.connection.getAccountInfo(buyerEscrow);
+
+    // Assertions.
+    assert.ok(afterEscrowState === null);
+    assert.ok(beforeEscrowState.lamports === 2*10**9);
   });
 });
