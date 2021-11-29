@@ -1129,14 +1129,28 @@ pub struct Sell<'info> {
     #[account(mut)]
     token_account: Account<'info, TokenAccount>,
     metadata: UncheckedAccount<'info>,
-    authority: UncheckedAccount<'info>,
+    #[account(signer)]
+    authority: AccountInfo<'info>,
     #[account(seeds=[PREFIX.as_bytes(), auction_house.creator.as_ref(), auction_house.treasury_mint.as_ref()], bump=auction_house.bump, has_one=authority, has_one=auction_house_fee_account)]
     auction_house: Account<'info, AuctionHouse>,
     #[account(mut, seeds=[PREFIX.as_bytes(), auction_house.key().as_ref(), FEE_PAYER.as_bytes()], bump=auction_house.fee_payer_bump)]
     auction_house_fee_account: UncheckedAccount<'info>,
     #[account(mut, seeds=[PREFIX.as_bytes(), wallet.key().as_ref(), auction_house.key().as_ref(), token_account.key().as_ref(), auction_house.treasury_mint.as_ref(), token_account.mint.as_ref(), &buyer_price.to_le_bytes(), &token_size.to_le_bytes()], bump=trade_state_bump)]
     seller_trade_state: UncheckedAccount<'info>,
-    #[account(mut, seeds=[PREFIX.as_bytes(), wallet.key().as_ref(), auction_house.key().as_ref(), token_account.key().as_ref(), auction_house.treasury_mint.as_ref(), token_account.mint.as_ref(), &0u64.to_le_bytes(), &token_size.to_le_bytes()], bump=free_trade_state_bump)]
+    #[account(
+				mut,
+				seeds=[
+						PREFIX.as_bytes(),
+						wallet.key().as_ref(),
+						auction_house.key().as_ref(),
+						token_account.key().as_ref(),
+						auction_house.treasury_mint.as_ref(),
+						token_account.mint.as_ref(),
+						&0u64.to_le_bytes(),
+						&token_size.to_le_bytes(),
+				],
+				bump=free_trade_state_bump,
+		)]
     free_seller_trade_state: UncheckedAccount<'info>,
     token_program: Program<'info, Token>,
     system_program: Program<'info, System>,
@@ -1157,7 +1171,8 @@ pub struct Buy<'info> {
     metadata: UncheckedAccount<'info>,
     #[account(mut, seeds=[PREFIX.as_bytes(), auction_house.key().as_ref(), wallet.key().as_ref()], bump=escrow_payment_bump)]
     escrow_payment_account: UncheckedAccount<'info>,
-    authority: UncheckedAccount<'info>,
+    #[account(signer)]
+    authority: AccountInfo<'info>,
     #[account(seeds=[PREFIX.as_bytes(), auction_house.creator.as_ref(), auction_house.treasury_mint.as_ref()], bump=auction_house.bump, has_one=authority, has_one=treasury_mint, has_one=auction_house_fee_account)]
     auction_house: Account<'info, AuctionHouse>,
     #[account(mut, seeds=[PREFIX.as_bytes(), auction_house.key().as_ref(), FEE_PAYER.as_bytes()], bump=auction_house.fee_payer_bump)]
@@ -1189,7 +1204,8 @@ pub struct ExecuteSale<'info> {
     seller_payment_receipt_account: UncheckedAccount<'info>,
     #[account(mut)]
     buyer_receipt_token_account: UncheckedAccount<'info>,
-    authority: UncheckedAccount<'info>,
+    #[account(signer)]
+    authority: AccountInfo<'info>,
     #[account(seeds=[PREFIX.as_bytes(), auction_house.creator.as_ref(), auction_house.treasury_mint.as_ref()], bump=auction_house.bump, has_one=authority, has_one=treasury_mint, has_one=auction_house_treasury, has_one=auction_house_fee_account)]
     auction_house: Account<'info, AuctionHouse>,
     #[account(mut, seeds=[PREFIX.as_bytes(), auction_house.key().as_ref(), FEE_PAYER.as_bytes()], bump=auction_house.fee_payer_bump)]
@@ -1220,7 +1236,8 @@ pub struct Deposit<'info> {
     #[account(mut, seeds=[PREFIX.as_bytes(), auction_house.key().as_ref(), wallet.key().as_ref()], bump=escrow_payment_bump)]
     escrow_payment_account: UncheckedAccount<'info>,
     treasury_mint: Account<'info, Mint>,
-    authority: UncheckedAccount<'info>,
+    #[account(signer)]
+    authority: AccountInfo<'info>,
     #[account(seeds=[PREFIX.as_bytes(), auction_house.creator.as_ref(), auction_house.treasury_mint.as_ref()], bump=auction_house.bump, has_one=authority, has_one=treasury_mint, has_one=auction_house_fee_account)]
     auction_house: Account<'info, AuctionHouse>,
     #[account(mut, seeds=[PREFIX.as_bytes(), auction_house.key().as_ref(), FEE_PAYER.as_bytes()], bump=auction_house.fee_payer_bump)]
@@ -1239,7 +1256,8 @@ pub struct Withdraw<'info> {
     #[account(mut, seeds=[PREFIX.as_bytes(), auction_house.key().as_ref(), wallet.key().as_ref()], bump=escrow_payment_bump)]
     escrow_payment_account: UncheckedAccount<'info>,
     treasury_mint: Account<'info, Mint>,
-    authority: UncheckedAccount<'info>,
+    #[account(signer)]
+    authority: AccountInfo<'info>,
     #[account(seeds=[PREFIX.as_bytes(), auction_house.creator.as_ref(), auction_house.treasury_mint.as_ref()], bump=auction_house.bump, has_one=authority, has_one=treasury_mint, has_one=auction_house_fee_account)]
     auction_house: Account<'info, AuctionHouse>,
     #[account(mut, seeds=[PREFIX.as_bytes(), auction_house.key().as_ref(), FEE_PAYER.as_bytes()], bump=auction_house.fee_payer_bump)]
@@ -1258,7 +1276,8 @@ pub struct Cancel<'info> {
     #[account(mut)]
     token_account: Account<'info, TokenAccount>,
     token_mint: Account<'info, Mint>,
-    authority: UncheckedAccount<'info>,
+    #[account(signer)]
+    authority: AccountInfo<'info>,
     #[account(seeds=[PREFIX.as_bytes(), auction_house.creator.as_ref(), auction_house.treasury_mint.as_ref()], bump=auction_house.bump, has_one=authority, has_one=auction_house_fee_account)]
     auction_house: Account<'info, AuctionHouse>,
     #[account(mut, seeds=[PREFIX.as_bytes(), auction_house.key().as_ref(), FEE_PAYER.as_bytes()], bump=auction_house.fee_payer_bump)]
@@ -1273,7 +1292,7 @@ pub struct Cancel<'info> {
 pub struct CreateAuctionHouse<'info> {
     treasury_mint: Account<'info, Mint>,
     payer: Signer<'info>,
-    authority: UncheckedAccount<'info>,
+    authority: AccountInfo<'info>,
     #[account(mut)]
     fee_withdrawal_destination: UncheckedAccount<'info>,
     #[account(mut)]

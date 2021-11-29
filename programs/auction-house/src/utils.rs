@@ -91,7 +91,7 @@ pub fn assert_metadata_valid<'a>(
 }
 
 pub fn get_fee_payer<'a, 'b>(
-    authority: &UncheckedAccount,
+    authority: &AccountInfo,
     auction_house: &anchor_lang::Account<AuctionHouse>,
     wallet: AccountInfo<'a>,
     auction_house_fee_account: AccountInfo<'a>,
