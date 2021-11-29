@@ -39,7 +39,7 @@ describe('auction-house', () => {
 	let authorityClient: Program<AuctionHouse>; // Reprents the exchange authority.
 	let sellerClient: Program<AuctionHouse>; // Represents the seller.
 	let buyerClient: Program<AuctionHouse>; // Represents the buyer.
-	let nftMintClient: Token;
+	let nftMintClient: Token; // Represents the NFT to be traded.
 
 	// Seeds constants.
 	const PREFIX = Buffer.from("auction_house");
@@ -373,8 +373,86 @@ describe('auction-house', () => {
 		);
 		console.log('sell:', txSig);
 	});
-});
 
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
+	it('Cancels an offer', async () => {
+		const buyerPrice = new u64(2);
+		const tokenSize = new u64(1);
+		const [tradeState] = await PublicKey.findProgramAddress(
+			[
+				PREFIX,
+				sellerWallet.publicKey.toBuffer(),
+				auctionHouse.toBuffer(),
+				sellerTokenAccount.toBuffer(),
+				treasuryMint.toBuffer(),
+				nftMintClient.publicKey.toBuffer(),
+				buyerPrice.toBuffer(),
+				tokenSize.toBuffer(),
+			],
+			AUCTION_HOUSE_PROGRAM_ID,
+		);
+		const txSig = await sellerClient.rpc.cancel(
+			buyerPrice,
+			tokenSize,
+			{
+				accounts: {
+					wallet: sellerWallet.publicKey,
+					tokenAccount: sellerTokenAccount,
+					tokenMint: nftMintClient.publicKey,
+					authority,
+					auctionHouse,
+					auctionHouseFeeAccount,
+					tradeState,
+					tokenProgram,
+				},
+				// @ts-ignore
+				signers: [authorityClient.provider.wallet.payer],
+			}
+		);
+		console.log('cancel:', txSig);
+	});
+
+	it('Posts a bid', async () => {
+		const buyerPrice = new u64(2);
+		const tokenSize = new u64(1);
+		const [buyerTradeState, buyerTradeStateBump] = await PublicKey.findProgramAddress(
+			[
+				PREFIX,
+				buyerWallet.publicKey.toBuffer(),
+				auctionHouse.toBuffer(),
+				sellerTokenAccount.toBuffer(),
+				treasuryMint.toBuffer(),
+				nftMintClient.publicKey.toBuffer(),
+				buyerPrice.toBuffer(),
+				tokenSize.toBuffer(),
+			],
+			AUCTION_HOUSE_PROGRAM_ID,
+		);
+		const txSig = await buyerClient.rpc.buy(
+			buyerTradeStateBump,
+			buyerEscrowBump,
+			buyerPrice,
+			tokenSize,
+			{
+				accounts: {
+					wallet: buyerWallet.publicKey,
+					paymentAccount: buyerWallet.publicKey,
+					transferAuthority: buyerWallet.publicKey,
+					treasuryMint,
+					tokenAccount: sellerTokenAccount,
+					metadata,
+					escrowPaymentAccount: buyerEscrow,
+					authority,
+					auctionHouse,
+					auctionHouseFeeAccount,
+					buyerTradeState,
+					tokenProgram,
+					systemProgram,
+					rent,
+				},
+			// @ts-ignore
+			signers: [authorityClient.provider.wallet.payer],
+			},
+		);
+		console.log('buy:', txSig);
+	});
+});
