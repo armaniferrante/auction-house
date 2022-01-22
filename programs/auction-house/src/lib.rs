@@ -141,7 +141,7 @@ pub mod auction_house {
         let treasury_withdrawal_destination = &ctx.accounts.treasury_withdrawal_destination;
         let token_program = &ctx.accounts.token_program;
         let system_program = &ctx.accounts.system_program;
-        let ata_program = &ctx.accounts.ata_program;
+        let associated_token_program = &ctx.accounts.associated_token_program;
         let rent = &ctx.accounts.rent;
         let is_native = treasury_mint.key() == spl_token::native_mint::id();
 
@@ -171,7 +171,7 @@ pub mod auction_house {
                     treasury_withdrawal_destination_owner.to_account_info(),
                     treasury_mint.to_account_info(),
                     payer.to_account_info(),
-                    ata_program.to_account_info(),
+                    associated_token_program.to_account_info(),
                     token_program.to_account_info(),
                     system_program.to_account_info(),
                     rent.to_account_info(),
@@ -215,7 +215,7 @@ pub mod auction_house {
         let treasury_withdrawal_destination = &ctx.accounts.treasury_withdrawal_destination;
         let token_program = &ctx.accounts.token_program;
         let system_program = &ctx.accounts.system_program;
-        let ata_program = &ctx.accounts.ata_program;
+        let associated_token_program = &ctx.accounts.associated_token_program;
         let rent = &ctx.accounts.rent;
 
         auction_house.bump = bump;
@@ -266,7 +266,7 @@ pub mod auction_house {
                     treasury_withdrawal_destination_owner.to_account_info(),
                     treasury_mint.to_account_info(),
                     payer.to_account_info(),
-                    ata_program.to_account_info(),
+                    associated_token_program.to_account_info(),
                     token_program.to_account_info(),
                     system_program.to_account_info(),
                     rent.to_account_info(),
@@ -303,7 +303,7 @@ pub mod auction_house {
         let treasury_mint = &ctx.accounts.treasury_mint;
         let system_program = &ctx.accounts.system_program;
         let token_program = &ctx.accounts.token_program;
-        let ata_program = &ctx.accounts.ata_program;
+        let associated_token_program = &ctx.accounts.associated_token_program;
         let rent = &ctx.accounts.rent;
 
         let auction_house_key = auction_house.key();
@@ -352,7 +352,7 @@ pub mod auction_house {
                     wallet.to_account_info(),
                     treasury_mint.to_account_info(),
                     fee_payer.to_account_info(),
-                    ata_program.to_account_info(),
+                    associated_token_program.to_account_info(),
                     token_program.to_account_info(),
                     system_program.to_account_info(),
                     rent.to_account_info(),
@@ -595,14 +595,14 @@ pub mod auction_house {
         let free_trade_state = &ctx.accounts.free_trade_state;
         let token_program = &ctx.accounts.token_program;
         let system_program = &ctx.accounts.system_program;
-        let ata_program = &ctx.accounts.ata_program;
+        let associated_token_program = &ctx.accounts.associated_token_program;
         let program_as_signer = &ctx.accounts.program_as_signer;
         let rent = &ctx.accounts.rent;
 
         let metadata_clone = metadata.to_account_info();
         let escrow_clone = escrow_payment_account.to_account_info();
         let auction_house_clone = auction_house.to_account_info();
-        let ata_clone = ata_program.to_account_info();
+        let ata_clone = associated_token_program.to_account_info();
         let token_clone = token_program.to_account_info();
         let sys_clone = system_program.to_account_info();
         let rent_clone = rent.to_account_info();
@@ -734,7 +734,7 @@ pub mod auction_house {
                     seller.to_account_info(),
                     treasury_mint.to_account_info(),
                     fee_payer.to_account_info(),
-                    ata_program.to_account_info(),
+                    associated_token_program.to_account_info(),
                     token_program.to_account_info(),
                     system_program.to_account_info(),
                     rent.to_account_info(),
@@ -793,7 +793,7 @@ pub mod auction_house {
                 buyer.to_account_info(),
                 token_mint.to_account_info(),
                 fee_payer.to_account_info(),
-                ata_program.to_account_info(),
+                associated_token_program.to_account_info(),
                 token_program.to_account_info(),
                 system_program.to_account_info(),
                 rent.to_account_info(),
@@ -1208,13 +1208,29 @@ pub struct Buy<'info> {
     treasury_mint: Account<'info, Mint>,
     token_account: Account<'info, TokenAccount>,
     metadata: UncheckedAccount<'info>,
-    #[account(mut, seeds=[PREFIX.as_bytes(), auction_house.key().as_ref(), wallet.key().as_ref()], bump=escrow_payment_bump)]
-    escrow_payment_account: UncheckedAccount<'info>,
     #[account(signer)]
     authority: AccountInfo<'info>,
-    #[account(seeds=[PREFIX.as_bytes(), auction_house.creator.as_ref(), auction_house.treasury_mint.as_ref()], bump=auction_house.bump, has_one=authority, has_one=treasury_mint, has_one=auction_house_fee_account)]
+    #[account(
+        seeds=[
+            PREFIX.as_bytes(),
+            authority.key.as_ref(),
+            treasury_mint.key().as_ref(),
+        ],
+        bump=auction_house.bump,
+        has_one=authority,
+        has_one=treasury_mint,
+        has_one=auction_house_fee_account,
+    )]
     auction_house: Account<'info, AuctionHouse>,
-    #[account(mut, seeds=[PREFIX.as_bytes(), auction_house.key().as_ref(), FEE_PAYER.as_bytes()], bump=auction_house.fee_payer_bump)]
+    #[account(
+        mut,
+        seeds=[
+            PREFIX.as_bytes(),
+            auction_house.key().as_ref(),
+            FEE_PAYER.as_bytes(),
+        ],
+        bump=auction_house.fee_payer_bump,
+    )]
     auction_house_fee_account: UncheckedAccount<'info>,
     #[account(
         mut,
@@ -1231,6 +1247,16 @@ pub struct Buy<'info> {
         bump=trade_state_bump,
     )]
     buyer_trade_state: UncheckedAccount<'info>,
+    #[account(
+        mut,
+        seeds=[
+            PREFIX.as_bytes(),
+            auction_house.key().as_ref(),
+            wallet.key().as_ref(),
+        ],
+        bump=escrow_payment_bump,
+    )]
+    escrow_payment_account: UncheckedAccount<'info>,
     token_program: Program<'info, Token>,
     system_program: Program<'info, System>,
     rent: Sysvar<'info, Rent>,
@@ -1354,7 +1380,7 @@ pub struct ExecuteSale<'info> {
     program_as_signer: UncheckedAccount<'info>,
     token_program: Program<'info, Token>,
     system_program: Program<'info, System>,
-    ata_program: Program<'info, AssociatedToken>,
+    associated_token_program: Program<'info, AssociatedToken>,
     rent: Sysvar<'info, Rent>,
 }
 
@@ -1448,7 +1474,7 @@ pub struct Withdraw<'info> {
     authority: AccountInfo<'info>,
     token_program: Program<'info, Token>,
     system_program: Program<'info, System>,
-    ata_program: Program<'info, AssociatedToken>,
+    associated_token_program: Program<'info, AssociatedToken>,
     rent: Sysvar<'info, Rent>,
 }
 
@@ -1506,6 +1532,9 @@ pub struct Cancel<'info> {
 #[derive(Accounts)]
 #[instruction(bump: u8, fee_payer_bump: u8, treasury_bump: u8)]
 pub struct CreateAuctionHouse<'info> {
+    // TODO: specify seeds for all token and mint accounts. PDA derivations
+    //       should work even if we're using a different program, e.g., the spl
+    //       token program.
     treasury_mint: Account<'info, Mint>,
     payer: Signer<'info>,
     authority: AccountInfo<'info>,
@@ -1548,7 +1577,7 @@ pub struct CreateAuctionHouse<'info> {
     auction_house_treasury: UncheckedAccount<'info>,
     token_program: Program<'info, Token>,
     system_program: Program<'info, System>,
-    ata_program: Program<'info, AssociatedToken>,
+    associated_token_program: Program<'info, AssociatedToken>,
     rent: Sysvar<'info, Rent>,
 }
 
@@ -1577,7 +1606,7 @@ pub struct UpdateAuctionHouse<'info> {
     auction_house: Account<'info, AuctionHouse>,
     token_program: Program<'info, Token>,
     system_program: Program<'info, System>,
-    ata_program: Program<'info, AssociatedToken>,
+    associated_token_program: Program<'info, AssociatedToken>,
     rent: Sysvar<'info, Rent>,
 }
 

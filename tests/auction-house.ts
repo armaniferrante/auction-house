@@ -14,12 +14,7 @@ import {
   SystemProgram,
   SYSVAR_RENT_PUBKEY,
 } from "@solana/web3.js";
-import {
-  u64,
-  Token,
-  ASSOCIATED_TOKEN_PROGRAM_ID,
-  TOKEN_PROGRAM_ID,
-} from "@solana/spl-token";
+import { u64, Token, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import * as metaplex from "@metaplex/js";
 import { IDL, AuctionHouse } from "../target/types/auction_house";
 const MetadataDataData = metaplex.programs.metadata.MetadataDataData;
@@ -56,6 +51,8 @@ describe("auction-house", () => {
   const SIGNER = Buffer.from("signer");
 
   // Constant accounts.
+  // @ts-ignore
+  const authorityKeypair = getProvider().wallet.payer;
   const authority = getProvider().wallet.publicKey;
   const feeWithdrawalDestination = authority;
   const treasuryWithdrawalDestination = authority;
@@ -63,14 +60,10 @@ describe("auction-house", () => {
   const treasuryMint = NATIVE_SOL_MINT;
   const tokenProgram = TOKEN_PROGRAM_ID;
   const systemProgram = SystemProgram.programId;
-  const ataProgram = ASSOCIATED_TOKEN_PROGRAM_ID;
-  const rent = SYSVAR_RENT_PUBKEY;
 
   // Uninitialized constant accounts.
   let metadata: PublicKey;
-  let programAsSigner: PublicKey;
   let auctionHouse: PublicKey;
-  let auctionHouseTreasury: PublicKey;
   let auctionHouseFeeAccount: PublicKey;
   let programAsSignerBump: number;
   let auctionHouseTreasuryBump: number;
@@ -184,10 +177,7 @@ describe("auction-house", () => {
       [PREFIX, _auctionHouse.toBuffer(), FEE_PAYER],
       AUCTION_HOUSE_PROGRAM_ID
     );
-    const [
-      _auctionHouseTreasury,
-      _auctionHouseTreasuryBump,
-    ] = await PublicKey.findProgramAddress(
+    const [, _auctionHouseTreasuryBump] = await PublicKey.findProgramAddress(
       [PREFIX, _auctionHouse.toBuffer(), TREASURY],
       AUCTION_HOUSE_PROGRAM_ID
     );
@@ -207,11 +197,9 @@ describe("auction-house", () => {
     bump = _bump;
     auctionHouseFeeAccount = _auctionHouseFeeAccount;
     auctionHouseFeeAccountBump = _auctionHouseFeeAccountBump;
-    auctionHouseTreasury = _auctionHouseTreasury;
     auctionHouseTreasuryBump = _auctionHouseTreasuryBump;
     buyerEscrow = _buyerEscrow;
     buyerEscrowBump = _buyerEscrowBump;
-    programAsSigner = _programAsSigner;
     programAsSignerBump = _programAsSignerBump;
   });
 
@@ -269,8 +257,6 @@ describe("auction-house", () => {
   });
 
   it("Deposits into an escrow account", async () => {
-    // @ts-ignore.
-    const authorityWallet = authorityClient.provider.wallet.payer;
     const amount = new BN(10 * 10 ** 9);
 
     const txSig = await buyerClient.methods
@@ -281,15 +267,13 @@ describe("auction-house", () => {
         treasuryMint,
         authority,
       })
-      .signers([authorityWallet])
+      .signers([authorityKeypair])
       .rpc();
 
     console.log("deposit:", txSig);
   });
 
   it("Withdraws from an escrow account", async () => {
-    // @ts-ignore
-    const authorityWallet = authorityClient.provider.wallet.payer;
     const amount = new BN(10 * 10 ** 9);
     const txSig = await buyerClient.methods
       .withdraw(buyerEscrowBump, amount)
@@ -299,15 +283,13 @@ describe("auction-house", () => {
         treasuryMint,
         authority,
       })
-      .signers([authorityWallet])
+      .signers([authorityKeypair])
       .rpc();
 
     console.log("withdraw:", txSig);
   });
 
   it("Posts an offer", async () => {
-    // @ts-ignore
-    const authorityWallet = authorityClient.provider.wallet.payer;
     const buyerPrice = new u64(2 * 10 ** 9);
     const tokenSize = new u64(1);
     const zero = new u64(0);
@@ -352,15 +334,13 @@ describe("auction-house", () => {
         authority,
         treasuryMint,
       })
-      .signers([authorityWallet])
+      .signers([authorityKeypair])
       .rpc();
 
     console.log("sell:", txSig);
   });
 
   it("Cancels an offer", async () => {
-    // @ts-ignore
-    const authorityWallet = authorityClient.provider.wallet.payer;
     const buyerPrice = new u64(2 * 10 ** 9);
     const tokenSize = new u64(1);
     const txSig = await sellerClient.methods
@@ -372,14 +352,12 @@ describe("auction-house", () => {
         authority,
         treasuryMint,
       })
-      .signers([authorityWallet])
+      .signers([authorityKeypair])
       .rpc();
     console.log("cancel:", txSig);
   });
 
   it("Posts an offer (again)", async () => {
-    // @ts-ignore
-    const authorityWallet = authorityClient.provider.wallet.payer;
     const buyerPrice = new u64(2 * 10 ** 9);
     const tokenSize = new u64(1);
     const zero = new u64(0);
@@ -424,7 +402,7 @@ describe("auction-house", () => {
         authority,
         treasuryMint,
       })
-      .signers([authorityWallet])
+      .signers([authorityKeypair])
       .rpc();
 
     console.log("sell:", txSig);
@@ -434,7 +412,7 @@ describe("auction-house", () => {
     const buyerPrice = new u64(2 * 10 ** 9);
     const tokenSize = new u64(1);
     const [
-      buyerTradeState,
+			,
       buyerTradeStateBump,
     ] = await PublicKey.findProgramAddress(
       [
@@ -449,32 +427,20 @@ describe("auction-house", () => {
       ],
       AUCTION_HOUSE_PROGRAM_ID
     );
-    const txSig = await buyerClient.rpc.buy(
-      buyerTradeStateBump,
-      buyerEscrowBump,
-      buyerPrice,
-      tokenSize,
-      {
-        accounts: {
-          wallet: buyerWallet.publicKey,
-          paymentAccount: buyerWallet.publicKey,
-          transferAuthority: buyerWallet.publicKey,
-          treasuryMint,
-          tokenAccount: sellerTokenAccount,
-          metadata,
-          escrowPaymentAccount: buyerEscrow,
-          authority,
-          auctionHouse,
-          auctionHouseFeeAccount,
-          buyerTradeState,
-          tokenProgram,
-          systemProgram,
-          rent,
-        },
-        // @ts-ignore
-        signers: [authorityClient.provider.wallet.payer],
-      }
-    );
+    const txSig = await buyerClient.methods
+      .buy(buyerTradeStateBump, buyerEscrowBump, buyerPrice, tokenSize)
+      .accounts({
+        wallet: buyerWallet.publicKey,
+        paymentAccount: buyerWallet.publicKey,
+        transferAuthority: buyerWallet.publicKey,
+        treasuryMint,
+        tokenAccount: sellerTokenAccount,
+        metadata,
+        authority,
+      })
+      .signers([authorityKeypair])
+      .rpc();
+
     console.log("buy:", txSig);
   });
 
