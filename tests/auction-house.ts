@@ -1,18 +1,17 @@
 import * as assert from "assert";
-import * as anchor from "../../../project-serum/anchor/ts";
+import * as anchor from "@project-serum/anchor/ts";
 import {
   Provider,
   Program,
   Wallet,
   BN,
   getProvider,
-} from "../../../project-serum/anchor/ts";
+} from "@project-serum/anchor";
 import {
   Transaction,
   Keypair,
   PublicKey,
   SystemProgram,
-  SYSVAR_RENT_PUBKEY,
 } from "@solana/web3.js";
 import { u64, Token, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import * as metaplex from "@metaplex/js";
@@ -59,7 +58,6 @@ describe("auction-house", () => {
   const treasuryWithdrawalDestinationOwner = authority;
   const treasuryMint = NATIVE_SOL_MINT;
   const tokenProgram = TOKEN_PROGRAM_ID;
-  const systemProgram = SystemProgram.programId;
 
   // Uninitialized constant accounts.
   let metadata: PublicKey;
@@ -510,7 +508,6 @@ describe("auction-house", () => {
         feeWithdrawalDestination,
         auctionHouseFeeAccount,
         auctionHouse,
-        systemProgram,
       })
       .rpc();
     console.log("withdrawFromFee:", txSig);
