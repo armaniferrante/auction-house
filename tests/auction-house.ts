@@ -1,12 +1,13 @@
 import * as assert from "assert";
-import * as anchor from "@project-serum/anchor/ts";
+//import * as anchor from "@project-serum/anchor/ts";
+import * as anchor from "../../../ts";
 import {
   Provider,
   Program,
   Wallet,
   BN,
   getProvider,
-} from "@project-serum/anchor";
+} from "../../../ts";
 import {
   Transaction,
   Keypair,
@@ -63,16 +64,11 @@ describe("auction-house", () => {
   let metadata: PublicKey;
   let auctionHouse: PublicKey;
   let auctionHouseFeeAccount: PublicKey;
-  let programAsSignerBump: number;
-  let auctionHouseTreasuryBump: number;
-  let auctionHouseFeeAccountBump: number;
-  let bump: number;
 
   // Buyer specific vars.
   const buyerWallet = Keypair.generate();
   let buyerTokenAccount: PublicKey;
   let buyerEscrow: PublicKey;
-  let buyerEscrowBump: number;
 
   // Seller specific vars.
   const sellerWallet = Keypair.generate();
@@ -164,37 +160,28 @@ describe("auction-house", () => {
   });
 
   it("Initializes constants", async () => {
-    const [_auctionHouse, _bump] = await PublicKey.findProgramAddress(
+    const [_auctionHouse] = await PublicKey.findProgramAddress(
       [PREFIX, authority.toBuffer(), treasuryMint.toBuffer()],
       AUCTION_HOUSE_PROGRAM_ID
     );
-    const [_auctionHouseFeeAccount, _auctionHouseFeeAccountBump] =
+    const [_auctionHouseFeeAccount] =
       await PublicKey.findProgramAddress(
         [PREFIX, _auctionHouse.toBuffer(), FEE_PAYER],
         AUCTION_HOUSE_PROGRAM_ID
       );
-    const [, _auctionHouseTreasuryBump] = await PublicKey.findProgramAddress(
-      [PREFIX, _auctionHouse.toBuffer(), TREASURY],
-      AUCTION_HOUSE_PROGRAM_ID
-    );
-    const [_buyerEscrow, _buyerEscrowBump] = await PublicKey.findProgramAddress(
+    const [_buyerEscrow] = await PublicKey.findProgramAddress(
       [PREFIX, _auctionHouse.toBuffer(), buyerWallet.publicKey.toBuffer()],
       AUCTION_HOUSE_PROGRAM_ID
     );
-    const [_programAsSigner, _programAsSignerBump] =
+    const [_programAsSigner] =
       await PublicKey.findProgramAddress(
         [PREFIX, SIGNER],
         AUCTION_HOUSE_PROGRAM_ID
       );
 
     auctionHouse = _auctionHouse;
-    bump = _bump;
     auctionHouseFeeAccount = _auctionHouseFeeAccount;
-    auctionHouseFeeAccountBump = _auctionHouseFeeAccountBump;
-    auctionHouseTreasuryBump = _auctionHouseTreasuryBump;
     buyerEscrow = _buyerEscrow;
-    buyerEscrowBump = _buyerEscrowBump;
-    programAsSignerBump = _programAsSignerBump;
   });
 
   it("Funds the buyer with lamports so that it can bid", async () => {
@@ -231,9 +218,6 @@ describe("auction-house", () => {
 
     const txSig = await authorityClient.methods
       .createAuctionHouse(
-        bump,
-        auctionHouseFeeAccountBump,
-        auctionHouseTreasuryBump,
         sellerFeeBasisPoints,
         requiresSignOff,
         canChangeSalePrice
@@ -254,7 +238,7 @@ describe("auction-house", () => {
     const amount = new BN(10 * 10 ** 9);
 
     const txSig = await buyerClient.methods
-      .deposit(buyerEscrowBump, amount)
+      .deposit(amount)
       .accounts({
         paymentAccount: buyerWallet.publicKey,
         transferAuthority: buyerWallet.publicKey,
@@ -270,7 +254,7 @@ describe("auction-house", () => {
   it("Withdraws from an escrow account", async () => {
     const amount = new BN(10 * 10 ** 9);
     const txSig = await buyerClient.methods
-      .withdraw(buyerEscrowBump, amount)
+      .withdraw(amount)
       .accounts({
         wallet: buyerWallet.publicKey,
         receiptAccount: buyerWallet.publicKey,
@@ -286,41 +270,8 @@ describe("auction-house", () => {
   it("Posts an offer", async () => {
     const buyerPrice = new u64(2 * 10 ** 9);
     const tokenSize = new u64(1);
-    const zero = new u64(0);
-    const [, sellerTradeStateBump] = await PublicKey.findProgramAddress(
-      [
-        PREFIX,
-        sellerWallet.publicKey.toBuffer(),
-        auctionHouse.toBuffer(),
-        sellerTokenAccount.toBuffer(),
-        treasuryMint.toBuffer(),
-        nftMintClient.publicKey.toBuffer(),
-        buyerPrice.toBuffer(),
-        tokenSize.toBuffer(),
-      ],
-      AUCTION_HOUSE_PROGRAM_ID
-    );
-    const [, freeSellerTradeStateBump] = await PublicKey.findProgramAddress(
-      [
-        PREFIX,
-        sellerWallet.publicKey.toBuffer(),
-        auctionHouse.toBuffer(),
-        sellerTokenAccount.toBuffer(),
-        treasuryMint.toBuffer(),
-        nftMintClient.publicKey.toBuffer(),
-        zero.toBuffer(),
-        tokenSize.toBuffer(),
-      ],
-      AUCTION_HOUSE_PROGRAM_ID
-    );
     const txSig = await sellerClient.methods
-      .sell(
-        sellerTradeStateBump,
-        freeSellerTradeStateBump,
-        programAsSignerBump,
-        buyerPrice,
-        tokenSize
-      )
+      .sell(buyerPrice, tokenSize)
       .accounts({
         wallet: sellerWallet.publicKey,
         tokenAccount: sellerTokenAccount,
@@ -354,38 +305,8 @@ describe("auction-house", () => {
   it("Posts an offer (again)", async () => {
     const buyerPrice = new u64(2 * 10 ** 9);
     const tokenSize = new u64(1);
-    const zero = new u64(0);
-    const [, sellerTradeStateBump] = await PublicKey.findProgramAddress(
-      [
-        PREFIX,
-        sellerWallet.publicKey.toBuffer(),
-        auctionHouse.toBuffer(),
-        sellerTokenAccount.toBuffer(),
-        treasuryMint.toBuffer(),
-        nftMintClient.publicKey.toBuffer(),
-        buyerPrice.toBuffer(),
-        tokenSize.toBuffer(),
-      ],
-      AUCTION_HOUSE_PROGRAM_ID
-    );
-    const [, freeSellerTradeStateBump] = await PublicKey.findProgramAddress(
-      [
-        PREFIX,
-        sellerWallet.publicKey.toBuffer(),
-        auctionHouse.toBuffer(),
-        sellerTokenAccount.toBuffer(),
-        treasuryMint.toBuffer(),
-        nftMintClient.publicKey.toBuffer(),
-        zero.toBuffer(),
-        tokenSize.toBuffer(),
-      ],
-      AUCTION_HOUSE_PROGRAM_ID
-    );
     const txSig = await sellerClient.methods
       .sell(
-        sellerTradeStateBump,
-        freeSellerTradeStateBump,
-        programAsSignerBump,
         buyerPrice,
         tokenSize
       )
@@ -405,21 +326,8 @@ describe("auction-house", () => {
   it("Posts a bid", async () => {
     const buyerPrice = new u64(2 * 10 ** 9);
     const tokenSize = new u64(1);
-    const [, buyerTradeStateBump] = await PublicKey.findProgramAddress(
-      [
-        PREFIX,
-        buyerWallet.publicKey.toBuffer(),
-        auctionHouse.toBuffer(),
-        sellerTokenAccount.toBuffer(),
-        treasuryMint.toBuffer(),
-        nftMintClient.publicKey.toBuffer(),
-        buyerPrice.toBuffer(),
-        tokenSize.toBuffer(),
-      ],
-      AUCTION_HOUSE_PROGRAM_ID
-    );
     const txSig = await buyerClient.methods
-      .buy(buyerTradeStateBump, buyerEscrowBump, buyerPrice, tokenSize)
+      .buy(buyerPrice, tokenSize)
       .accounts({
         wallet: buyerWallet.publicKey,
         paymentAccount: buyerWallet.publicKey,
@@ -435,6 +343,7 @@ describe("auction-house", () => {
     console.log("buy:", txSig);
   });
 
+
   it("Executes a trades", async () => {
     // Before state.
     const beforeEscrowState =
@@ -447,25 +356,8 @@ describe("auction-house", () => {
     // Execute trade.
     const buyerPrice = new u64(2 * 10 ** 9);
     const tokenSize = new u64(1);
-    const zero = new u64(0);
-    const [, freeSellerTradeStateBump] = await PublicKey.findProgramAddress(
-      [
-        PREFIX,
-        sellerWallet.publicKey.toBuffer(),
-        auctionHouse.toBuffer(),
-        sellerTokenAccount.toBuffer(),
-        treasuryMint.toBuffer(),
-        nftMintClient.publicKey.toBuffer(),
-        zero.toBuffer(),
-        tokenSize.toBuffer(),
-      ],
-      AUCTION_HOUSE_PROGRAM_ID
-    );
     const txSig = await authorityClient.methods
       .executeSale(
-        buyerEscrowBump,
-        freeSellerTradeStateBump,
-        programAsSignerBump,
         buyerPrice,
         tokenSize
       )
@@ -506,8 +398,6 @@ describe("auction-house", () => {
         authority,
         treasuryMint,
         feeWithdrawalDestination,
-        auctionHouseFeeAccount,
-        auctionHouse,
       })
       .rpc();
     console.log("withdrawFromFee:", txSig);
