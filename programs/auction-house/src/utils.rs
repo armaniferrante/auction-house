@@ -265,7 +265,6 @@ pub fn create_program_token_account_if_not_present<'a>(
             fee_seeds,
             signer_seeds,
         )?;
-        msg!("This.");
         invoke_signed(
             &initialize_account2(
                 &token_program.key,

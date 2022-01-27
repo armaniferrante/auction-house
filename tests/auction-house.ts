@@ -1,13 +1,7 @@
 import * as assert from "assert";
 //import * as anchor from "@project-serum/anchor/ts";
 import * as anchor from "../../../ts";
-import {
-  Provider,
-  Program,
-  Wallet,
-  BN,
-  getProvider,
-} from "../../../ts";
+import { Provider, Program, Wallet, BN, getProvider } from "../../../ts";
 import {
   Transaction,
   Keypair,
@@ -47,8 +41,6 @@ describe("auction-house", () => {
   // Seeds constants.
   const PREFIX = Buffer.from("auction_house");
   const FEE_PAYER = Buffer.from("fee_payer");
-  const TREASURY = Buffer.from("treasury");
-  const SIGNER = Buffer.from("signer");
 
   // Constant accounts.
   // @ts-ignore
@@ -68,7 +60,6 @@ describe("auction-house", () => {
   // Buyer specific vars.
   const buyerWallet = Keypair.generate();
   let buyerTokenAccount: PublicKey;
-  let buyerEscrow: PublicKey;
 
   // Seller specific vars.
   const sellerWallet = Keypair.generate();
@@ -164,24 +155,12 @@ describe("auction-house", () => {
       [PREFIX, authority.toBuffer(), treasuryMint.toBuffer()],
       AUCTION_HOUSE_PROGRAM_ID
     );
-    const [_auctionHouseFeeAccount] =
-      await PublicKey.findProgramAddress(
-        [PREFIX, _auctionHouse.toBuffer(), FEE_PAYER],
-        AUCTION_HOUSE_PROGRAM_ID
-      );
-    const [_buyerEscrow] = await PublicKey.findProgramAddress(
-      [PREFIX, _auctionHouse.toBuffer(), buyerWallet.publicKey.toBuffer()],
+    const [_auctionHouseFeeAccount] = await PublicKey.findProgramAddress(
+      [PREFIX, _auctionHouse.toBuffer(), FEE_PAYER],
       AUCTION_HOUSE_PROGRAM_ID
     );
-    const [_programAsSigner] =
-      await PublicKey.findProgramAddress(
-        [PREFIX, SIGNER],
-        AUCTION_HOUSE_PROGRAM_ID
-      );
-
     auctionHouse = _auctionHouse;
     auctionHouseFeeAccount = _auctionHouseFeeAccount;
-    buyerEscrow = _buyerEscrow;
   });
 
   it("Funds the buyer with lamports so that it can bid", async () => {
@@ -293,7 +272,6 @@ describe("auction-house", () => {
       .accounts({
         wallet: sellerWallet.publicKey,
         tokenAccount: sellerTokenAccount,
-        tokenMint: nftMintClient.publicKey,
         authority,
         treasuryMint,
       })
@@ -306,10 +284,7 @@ describe("auction-house", () => {
     const buyerPrice = new u64(2 * 10 ** 9);
     const tokenSize = new u64(1);
     const txSig = await sellerClient.methods
-      .sell(
-        buyerPrice,
-        tokenSize
-      )
+      .sell(buyerPrice, tokenSize)
       .accounts({
         wallet: sellerWallet.publicKey,
         tokenAccount: sellerTokenAccount,
@@ -343,24 +318,24 @@ describe("auction-house", () => {
     console.log("buy:", txSig);
   });
 
-
   it("Executes a trades", async () => {
+    const [buyerEscrow] = await PublicKey.findProgramAddress(
+      [PREFIX, auctionHouse.toBuffer(), buyerWallet.publicKey.toBuffer()],
+      AUCTION_HOUSE_PROGRAM_ID
+    );
     // Before state.
-    const beforeEscrowState =
-      await authorityClient.provider.connection.getAccountInfo(buyerEscrow);
-    const beforeSeller =
-      await authorityClient.provider.connection.getAccountInfo(
-        sellerWallet.publicKey
-      );
+    const beforeEscrowState = await authorityClient.provider.connection.getAccountInfo(
+      buyerEscrow
+    );
+    const beforeSeller = await authorityClient.provider.connection.getAccountInfo(
+      sellerWallet.publicKey
+    );
 
     // Execute trade.
     const buyerPrice = new u64(2 * 10 ** 9);
     const tokenSize = new u64(1);
     const txSig = await authorityClient.methods
-      .executeSale(
-        buyerPrice,
-        tokenSize
-      )
+      .executeSale(buyerPrice, tokenSize)
       .accounts({
         buyer: buyerWallet.publicKey,
         seller: sellerWallet.publicKey,
@@ -378,12 +353,12 @@ describe("auction-house", () => {
     console.log("executeSale:", txSig);
 
     // After state.
-    const afterEscrowState =
-      await authorityClient.provider.connection.getAccountInfo(buyerEscrow);
-    const afterSeller =
-      await authorityClient.provider.connection.getAccountInfo(
-        sellerWallet.publicKey
-      );
+    const afterEscrowState = await authorityClient.provider.connection.getAccountInfo(
+      buyerEscrow
+    );
+    const afterSeller = await authorityClient.provider.connection.getAccountInfo(
+      sellerWallet.publicKey
+    );
 
     // Assertions.
     assert.ok(afterEscrowState === null);

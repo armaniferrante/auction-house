@@ -1126,20 +1126,14 @@ pub mod auction_house {
 
 #[derive(Accounts)]
 pub struct CreateAuctionHouse<'info> {
-    // TODO: specify seeds for all token and mint accounts. PDA derivations
-    //       should work even if we're using a different program, e.g., the spl
-    //       token program.
     treasury_mint: Account<'info, Mint>,
     payer: Signer<'info>,
     authority: AccountInfo<'info>,
     #[account(mut)]
     fee_withdrawal_destination: UncheckedAccount<'info>,
+    treasury_withdrawal_destination_owner: UncheckedAccount<'info>,
     #[account(mut)]
     treasury_withdrawal_destination: UncheckedAccount<'info>,
-    treasury_withdrawal_destination_owner: UncheckedAccount<'info>,
-    //
-    // MARK: Auto derived.
-    //
     #[account(
         init,
         seeds=[
