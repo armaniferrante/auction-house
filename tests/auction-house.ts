@@ -324,12 +324,12 @@ describe("auction-house", () => {
       AUCTION_HOUSE_PROGRAM_ID
     );
     // Before state.
-    const beforeEscrowState = await authorityClient.provider.connection.getAccountInfo(
-      buyerEscrow
-    );
-    const beforeSeller = await authorityClient.provider.connection.getAccountInfo(
-      sellerWallet.publicKey
-    );
+    const beforeEscrowState =
+      await authorityClient.provider.connection.getAccountInfo(buyerEscrow);
+    const beforeSeller =
+      await authorityClient.provider.connection.getAccountInfo(
+        sellerWallet.publicKey
+      );
 
     // Execute trade.
     const buyerPrice = new u64(2 * 10 ** 9);
@@ -353,12 +353,12 @@ describe("auction-house", () => {
     console.log("executeSale:", txSig);
 
     // After state.
-    const afterEscrowState = await authorityClient.provider.connection.getAccountInfo(
-      buyerEscrow
-    );
-    const afterSeller = await authorityClient.provider.connection.getAccountInfo(
-      sellerWallet.publicKey
-    );
+    const afterEscrowState =
+      await authorityClient.provider.connection.getAccountInfo(buyerEscrow);
+    const afterSeller =
+      await authorityClient.provider.connection.getAccountInfo(
+        sellerWallet.publicKey
+      );
 
     // Assertions.
     assert.ok(afterEscrowState === null);
