@@ -463,14 +463,11 @@ pub mod auction_house {
     ) -> ProgramResult {
         let wallet = &ctx.accounts.wallet;
         let token_account = &ctx.accounts.token_account;
-        let token_mint = &ctx.accounts.token_mint;
         let authority = &ctx.accounts.authority;
         let auction_house = &ctx.accounts.auction_house;
         let auction_house_fee_account = &ctx.accounts.auction_house_fee_account;
         let trade_state = &ctx.accounts.trade_state;
         let token_program = &ctx.accounts.token_program;
-
-        assert_keys_equal(token_mint.key(), token_account.mint)?;
 
         if !wallet.to_account_info().is_signer && !authority.to_account_info().is_signer {
             return Err(ErrorCode::NoValidSignerPresent.into());
@@ -1345,7 +1342,6 @@ pub struct Cancel<'info> {
     wallet: UncheckedAccount<'info>,
     #[account(mut)]
     token_account: Account<'info, TokenAccount>,
-    token_mint: Account<'info, Mint>,
     #[account(signer)]
     authority: AccountInfo<'info>,
     treasury_mint: UncheckedAccount<'info>,
@@ -1379,7 +1375,7 @@ pub struct Cancel<'info> {
             auction_house.key().as_ref(),
             token_account.key().as_ref(),
             auction_house.treasury_mint.as_ref(),
-            token_mint.key().as_ref(),
+            token_account.mint.as_ref(),
             buyer_price.to_le_bytes().as_ref(),
             token_size.to_le_bytes().as_ref(),
         ],
