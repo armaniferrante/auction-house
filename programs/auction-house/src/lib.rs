@@ -1207,7 +1207,7 @@ pub struct ExecuteSale<'info> {
     #[account(signer)]
     authority: AccountInfo<'info>,
     #[account(seeds=[PREFIX.as_bytes(), auction_house.creator.as_ref(), auction_house.treasury_mint.as_ref()], bump=auction_house.bump, has_one=authority, has_one=treasury_mint, has_one=auction_house_treasury, has_one=auction_house_fee_account)]
-    auction_house: Account<'info, AuctionHouse>,
+    auction_house: Box<Account<'info, AuctionHouse>>,
     #[account(mut, seeds=[PREFIX.as_bytes(), auction_house.key().as_ref(), FEE_PAYER.as_bytes()], bump=auction_house.fee_payer_bump)]
     auction_house_fee_account: UncheckedAccount<'info>,
     #[account(mut, seeds=[PREFIX.as_bytes(), auction_house.key().as_ref(), TREASURY.as_bytes()], bump=auction_house.treasury_bump)]
@@ -1350,7 +1350,7 @@ pub struct WithdrawFromFee<'info> {
     fee_withdrawal_destination: UncheckedAccount<'info>,
     #[account(mut, seeds=[PREFIX.as_bytes(), auction_house.key().as_ref(), FEE_PAYER.as_bytes()], bump=auction_house.fee_payer_bump)]
     auction_house_fee_account: UncheckedAccount<'info>,
-    #[account(mut, seeds=[PREFIX.as_bytes(), auction_house.creator.as_ref(), auction_house.treasury_mint.key().as_ref()], bump=auction_house.bump, has_one=authority, has_one=fee_withdrawal_destination, has_one=auction_house_fee_account)]
+    #[account(mut, seeds=[PREFIX.as_bytes(), auction_house.creator.as_ref(), auction_house.treasury_mint.as_ref()], bump=auction_house.bump, has_one=authority, has_one=fee_withdrawal_destination, has_one=auction_house_fee_account)]
     auction_house: Account<'info, AuctionHouse>,
     system_program: Program<'info, System>,
 }

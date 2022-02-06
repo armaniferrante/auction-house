@@ -13,16 +13,16 @@ use {
     arrayref::array_ref,
     metaplex_token_metadata::state::Metadata,
     spl_associated_token_account::get_associated_token_address,
-    spl_token::{instruction::initialize_account2, state::Account},
+    spl_token::{instruction::initialize_account2, state::Account as SplAccount},
     std::{convert::TryInto, slice::Iter},
 };
 pub fn assert_is_ata(
     ata: &AccountInfo,
     wallet: &Pubkey,
     mint: &Pubkey,
-) -> Result<Account, ProgramError> {
+) -> Result<SplAccount, ProgramError> {
     assert_owned_by(ata, &spl_token::id())?;
-    let ata_account: Account = assert_initialized(ata)?;
+    let ata_account: SplAccount = assert_initialized(ata)?;
     assert_keys_equal(ata_account.owner, *wallet)?;
     assert_keys_equal(get_associated_token_address(wallet, mint), *ata.key)?;
     Ok(ata_account)
@@ -72,7 +72,7 @@ pub fn make_ata<'a>(
 
 pub fn assert_metadata_valid<'a>(
     metadata: &UncheckedAccount,
-    token_account: &anchor_lang::Account<'a, TokenAccount>,
+    token_account: &Account<'a, TokenAccount>,
 ) -> ProgramResult {
     assert_derivation(
         &metaplex_token_metadata::id(),
@@ -92,7 +92,7 @@ pub fn assert_metadata_valid<'a>(
 
 pub fn get_fee_payer<'a, 'b>(
     authority: &AccountInfo,
-    auction_house: &anchor_lang::Account<AuctionHouse>,
+    auction_house: &Account<AuctionHouse>,
     wallet: AccountInfo<'a>,
     auction_house_fee_account: AccountInfo<'a>,
     auction_house_seeds: &'b [&'b [u8]],
@@ -120,10 +120,10 @@ pub fn assert_valid_delegation(
     src_wallet: &AccountInfo,
     dst_wallet: &AccountInfo,
     transfer_authority: &AccountInfo,
-    mint: &anchor_lang::Account<Mint>,
+    mint: &Account<Mint>,
     paysize: u64,
 ) -> ProgramResult {
-    match Account::unpack(&src_account.data.borrow()) {
+    match SplAccount::unpack(&src_account.data.borrow()) {
         Ok(token_account) => {
             // Ensure that the delegated amount is exactly equal to the maker_size
             msg!(
@@ -191,7 +191,7 @@ pub fn assert_owned_by(account: &AccountInfo, owner: &Pubkey) -> ProgramResult {
 
 #[allow(clippy::too_many_arguments)]
 pub fn pay_auction_house_fees<'a>(
-    auction_house: &anchor_lang::Account<'a, AuctionHouse>,
+    auction_house: &Account<'a, AuctionHouse>,
     auction_house_treasury: &AccountInfo<'a>,
     escrow_payment_account: &AccountInfo<'a>,
     token_program: &AccountInfo<'a>,
@@ -247,7 +247,7 @@ pub fn create_program_token_account_if_not_present<'a>(
     system_program: &Program<'a, System>,
     fee_payer: &AccountInfo<'a>,
     token_program: &Program<'a, Token>,
-    treasury_mint: &anchor_lang::Account<'a, Mint>,
+    treasury_mint: &Account<'a, Mint>,
     owner: &AccountInfo<'a>,
     rent: &Sysvar<'a, Rent>,
     signer_seeds: &[&[u8]],
@@ -261,7 +261,7 @@ pub fn create_program_token_account_if_not_present<'a>(
             &rent.to_account_info(),
             &system_program,
             &fee_payer,
-            spl_token::state::Account::LEN,
+            SplAccount::LEN,
             fee_seeds,
             signer_seeds,
         )?;
