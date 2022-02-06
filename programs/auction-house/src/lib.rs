@@ -1291,6 +1291,7 @@ pub struct Cancel<'info> {
 #[instruction(bump: u8, fee_payer_bump: u8, treasury_bump: u8)]
 pub struct CreateAuctionHouse<'info> {
     treasury_mint: Account<'info, Mint>,
+    #[account(mut)]
     payer: Signer<'info>,
     authority: AccountInfo<'info>,
     #[account(mut)]
