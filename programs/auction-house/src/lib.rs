@@ -1124,6 +1124,7 @@ pub mod auction_house {
 #[derive(Accounts)]
 pub struct CreateAuctionHouse<'info> {
     treasury_mint: Account<'info, Mint>,
+    #[account(mut)]
     payer: Signer<'info>,
     authority: AccountInfo<'info>,
     #[account(mut)]
