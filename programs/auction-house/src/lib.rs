@@ -1,30 +1,28 @@
+pub mod bid;
+pub mod constants;
+pub mod pda;
 pub mod utils;
-
-use {
-    crate::utils::*,
-    anchor_lang::{
-        prelude::*,
-        solana_program::{
-            program::{invoke, invoke_signed},
-            system_instruction,
-        },
-        AnchorDeserialize, AnchorSerialize,
+use crate::bid::*;
+use crate::{constants::*, utils::*};
+use anchor_lang::{
+    prelude::*,
+    solana_program::{
+        program::{invoke, invoke_signed},
+        system_instruction,
     },
-    anchor_spl::{
-        associated_token::AssociatedToken,
-        token::{Mint, Token, TokenAccount},
-    },
-    spl_token::instruction::{approve, revoke},
+    AnchorDeserialize, AnchorSerialize,
 };
+use anchor_spl::{
+    associated_token::AssociatedToken,
+    token::{Mint, Token, TokenAccount},
+};
+use spl_token::instruction::{approve, revoke};
 
 anchor_lang::declare_id!("hausS13jsjafwWwGqZTUQRmWyvyxn9EQpqMwV1PBBmk");
 
-const PREFIX: &str = "auction_house";
-const FEE_PAYER: &str = "fee_payer";
-const TREASURY: &str = "treasury";
-const SIGNER: &str = "signer";
 #[program]
 pub mod auction_house {
+    use solana_program::program_memory::sol_memset;
     use super::*;
     pub fn withdraw_from_fee<'info>(
         ctx: Context<'_, '_, '_, 'info, WithdrawFromFee<'info>>,
@@ -465,7 +463,7 @@ pub mod auction_house {
 
         if !is_native {
             assert_is_ata(payment_account, &wallet.key(), &treasury_mint.key())?;
-            invoke_signed(
+            invoke(
                 &spl_token::instruction::transfer(
                     token_program.key,
                     &payment_account.key(),
@@ -480,11 +478,10 @@ pub mod auction_house {
                     token_program.to_account_info(),
                     transfer_authority.to_account_info(),
                 ],
-                &[],
             )?;
         } else {
             assert_keys_equal(payment_account.key(), wallet.key())?;
-            invoke_signed(
+            invoke(
                 &system_instruction::transfer(
                     &payment_account.key(),
                     &escrow_payment_account.key(),
@@ -495,7 +492,6 @@ pub mod auction_house {
                     payment_account.to_account_info(),
                     system_program.to_account_info(),
                 ],
-                &[],
             )?;
         }
 
@@ -504,8 +500,8 @@ pub mod auction_house {
 
     pub fn cancel<'info>(
         ctx: Context<'_, '_, '_, 'info, Cancel<'info>>,
-        _buyer_price: u64,
-        _token_size: u64,
+        buyer_price: u64,
+        token_size: u64,
     ) -> ProgramResult {
         let wallet = &ctx.accounts.wallet;
         let token_account = &ctx.accounts.token_account;
@@ -515,13 +511,22 @@ pub mod auction_house {
         let auction_house_fee_account = &ctx.accounts.auction_house_fee_account;
         let trade_state = &ctx.accounts.trade_state;
         let token_program = &ctx.accounts.token_program;
-
+        let ts_bump = trade_state.try_borrow_data()?[0];
+        assert_valid_trade_state(
+            &wallet.key(),
+            auction_house,
+            buyer_price,
+            token_size,
+            &trade_state.to_account_info(),
+            &token_account.mint.key(),
+            &token_account.key(),
+            ts_bump,
+        )?;
         assert_keys_equal(token_mint.key(), token_account.mint)?;
-
         if !wallet.to_account_info().is_signer && !authority.to_account_info().is_signer {
             return Err(ErrorCode::NoValidSignerPresent.into());
         }
-
+        msg!("kdjhkfjhd");
         let auction_house_key = auction_house.key();
         let seeds = [
             PREFIX.as_bytes(),
@@ -538,16 +543,8 @@ pub mod auction_house {
             &seeds,
         )?;
 
-        let curr_lamp = trade_state.lamports();
-        **trade_state.lamports.borrow_mut() = 0;
-
-        **fee_payer.lamports.borrow_mut() = fee_payer
-            .lamports()
-            .checked_add(curr_lamp)
-            .ok_or(ErrorCode::NumericalOverflow)?;
-
         if token_account.owner == wallet.key() && wallet.is_signer {
-            invoke_signed(
+            invoke(
                 &revoke(
                     &token_program.key(),
                     &token_account.key(),
@@ -560,13 +557,24 @@ pub mod auction_house {
                     token_account.to_account_info(),
                     wallet.to_account_info(),
                 ],
-                &[],
             )?;
         }
 
+        let curr_lamp = trade_state.lamports();
+        **trade_state.lamports.borrow_mut() = 0;
+
+        **fee_payer.lamports.borrow_mut() = fee_payer
+            .lamports()
+            .checked_add(curr_lamp)
+            .ok_or(ErrorCode::NumericalOverflow)?;
+        sol_memset(
+            *trade_state.try_borrow_mut_data()?,
+            0,
+            TRADE_STATE_SIZE,
+        );
         Ok(())
     }
-
+    #[inline(never)]
     pub fn execute_sale<'info>(
         ctx: Context<'_, '_, '_, 'info, ExecuteSale<'info>>,
         escrow_payment_bump: u8,
@@ -625,8 +633,20 @@ pub mod auction_house {
             msg!("No delegate detected on token account.");
             return Err(ErrorCode::BothPartiesNeedToAgreeToSale.into());
         }
-
-        if buyer_trade_state.data_is_empty() || seller_trade_state.data_is_empty() {
+        let buyer_ts_data = &mut buyer_trade_state.try_borrow_mut_data()?;
+        let seller_ts_data = &mut seller_trade_state.try_borrow_mut_data()?;
+        let ts_bump = buyer_ts_data[0];
+        assert_valid_trade_state(
+            &buyer.key(),
+            auction_house,
+            buyer_price,
+            token_size,
+            buyer_trade_state,
+            &token_mint.key(),
+            &token_account.key(),
+            ts_bump,
+        )?;
+        if ts_bump == 0 || buyer_ts_data.len() == 0 || seller_ts_data.len() == 0 {
             return Err(ErrorCode::BothPartiesNeedToAgreeToSale.into());
         }
 
@@ -654,13 +674,12 @@ pub mod auction_house {
             &seller.key(),
             &token_account_mint,
         )?;
-
         assert_derivation(
-            &metaplex_token_metadata::id(),
+            &mpl_token_metadata::id(),
             &metadata.to_account_info(),
             &[
-                metaplex_token_metadata::state::PREFIX.as_bytes(),
-                metaplex_token_metadata::id().as_ref(),
+                mpl_token_metadata::state::PREFIX.as_bytes(),
+                mpl_token_metadata::id().as_ref(),
                 token_account_mint.as_ref(),
             ],
         )?;
@@ -832,6 +851,11 @@ pub mod auction_house {
 
         let curr_seller_lamp = seller_trade_state.lamports();
         **seller_trade_state.lamports.borrow_mut() = 0;
+        sol_memset(
+            &mut *seller_ts_data,
+            0,
+            TRADE_STATE_SIZE,
+        );
 
         **fee_payer.lamports.borrow_mut() = fee_payer
             .lamports()
@@ -840,7 +864,11 @@ pub mod auction_house {
 
         let curr_buyer_lamp = buyer_trade_state.lamports();
         **buyer_trade_state.lamports.borrow_mut() = 0;
-
+        sol_memset(
+            &mut *buyer_ts_data,
+            0,
+            TRADE_STATE_SIZE,
+        );
         **fee_payer.lamports.borrow_mut() = fee_payer
             .lamports()
             .checked_add(curr_buyer_lamp)
@@ -854,6 +882,11 @@ pub mod auction_house {
                 .lamports()
                 .checked_add(curr_buyer_lamp)
                 .ok_or(ErrorCode::NumericalOverflow)?;
+            sol_memset(
+                *free_trade_state.try_borrow_mut_data()?,
+                0,
+                TRADE_STATE_SIZE,
+            );
         }
         Ok(())
     }
@@ -910,7 +943,6 @@ pub mod auction_house {
             auction_house_fee_account.to_account_info(),
             &seeds,
         )?;
-
         assert_is_ata(
             &token_account.to_account_info(),
             &wallet.key(),
@@ -924,7 +956,7 @@ pub mod auction_house {
         }
 
         if wallet.is_signer {
-            invoke_signed(
+            invoke(
                 &approve(
                     &token_program.key(),
                     &token_account.key(),
@@ -940,7 +972,6 @@ pub mod auction_house {
                     program_as_signer.to_account_info(),
                     wallet.to_account_info(),
                 ],
-                &[],
             )?;
         }
 
@@ -984,141 +1015,29 @@ pub mod auction_house {
         buyer_price: u64,
         token_size: u64,
     ) -> ProgramResult {
-        let wallet = &ctx.accounts.wallet;
-        let payment_account = &ctx.accounts.payment_account;
-        let transfer_authority = &ctx.accounts.transfer_authority;
-        let treasury_mint = &ctx.accounts.treasury_mint;
-        let metadata = &ctx.accounts.metadata;
-        let token_account = &ctx.accounts.token_account;
-        let escrow_payment_account = &ctx.accounts.escrow_payment_account;
-        let authority = &ctx.accounts.authority;
-        let auction_house = &ctx.accounts.auction_house;
-        let auction_house_fee_account = &ctx.accounts.auction_house_fee_account;
-        let buyer_trade_state = &mut ctx.accounts.buyer_trade_state;
-        let token_program = &ctx.accounts.token_program;
-        let system_program = &ctx.accounts.system_program;
-        let rent = &ctx.accounts.rent;
+        private_bid(
+            ctx,
+            trade_state_bump,
+            escrow_payment_bump,
+            buyer_price,
+            token_size,
+        )
+    }
 
-        let auction_house_key = auction_house.key();
-        let seeds = [
-            PREFIX.as_bytes(),
-            auction_house_key.as_ref(),
-            FEE_PAYER.as_bytes(),
-            &[auction_house.fee_payer_bump],
-        ];
-
-        let (fee_payer, fee_seeds) = get_fee_payer(
-            authority,
-            auction_house,
-            wallet.to_account_info(),
-            auction_house_fee_account.to_account_info(),
-            &seeds,
-        )?;
-
-        let is_native = treasury_mint.key() == spl_token::native_mint::id();
-
-        let auction_house_key = auction_house.key();
-        let wallet_key = wallet.key();
-        let escrow_signer_seeds = [
-            PREFIX.as_bytes(),
-            auction_house_key.as_ref(),
-            wallet_key.as_ref(),
-            &[escrow_payment_bump],
-        ];
-
-        create_program_token_account_if_not_present(
-            escrow_payment_account,
-            system_program,
-            &fee_payer,
-            token_program,
-            treasury_mint,
-            &auction_house.to_account_info(),
-            rent,
-            &escrow_signer_seeds,
-            fee_seeds,
-            is_native,
-        )?;
-
-        if is_native {
-            assert_keys_equal(wallet.key(), payment_account.key())?;
-
-            if escrow_payment_account.lamports() < buyer_price {
-                let diff = buyer_price
-                    .checked_sub(escrow_payment_account.lamports())
-                    .ok_or(ErrorCode::NumericalOverflow)?;
-                invoke_signed(
-                    &system_instruction::transfer(
-                        &payment_account.key(),
-                        &escrow_payment_account.key(),
-                        diff,
-                    ),
-                    &[
-                        payment_account.to_account_info(),
-                        escrow_payment_account.to_account_info(),
-                        system_program.to_account_info(),
-                    ],
-                    &[],
-                )?;
-            }
-        } else {
-            let escrow_payment_loaded: spl_token::state::Account =
-                assert_initialized(escrow_payment_account)?;
-
-            if escrow_payment_loaded.amount < buyer_price {
-                let diff = buyer_price
-                    .checked_sub(escrow_payment_loaded.amount)
-                    .ok_or(ErrorCode::NumericalOverflow)?;
-                invoke(
-                    &spl_token::instruction::transfer(
-                        &token_program.key(),
-                        &payment_account.key(),
-                        &escrow_payment_account.key(),
-                        &transfer_authority.key(),
-                        &[],
-                        diff,
-                    )?,
-                    &[
-                        transfer_authority.to_account_info(),
-                        payment_account.to_account_info(),
-                        escrow_payment_account.to_account_info(),
-                        token_program.to_account_info(),
-                    ],
-                )?;
-            }
-        }
-
-        assert_metadata_valid(metadata, token_account)?;
-
-        let ts_info = buyer_trade_state.to_account_info();
-        if ts_info.data_is_empty() {
-            let token_account_key = token_account.key();
-            let wallet_key = wallet.key();
-            let ts_seeds = [
-                PREFIX.as_bytes(),
-                wallet_key.as_ref(),
-                auction_house_key.as_ref(),
-                token_account_key.as_ref(),
-                auction_house.treasury_mint.as_ref(),
-                token_account.mint.as_ref(),
-                &buyer_price.to_le_bytes(),
-                &token_size.to_le_bytes(),
-                &[trade_state_bump],
-            ];
-            create_or_allocate_account_raw(
-                *ctx.program_id,
-                &ts_info,
-                &rent.to_account_info(),
-                &system_program,
-                &fee_payer,
-                TRADE_STATE_SIZE,
-                fee_seeds,
-                &ts_seeds,
-            )?;
-        }
-        let data = &mut ts_info.data.borrow_mut();
-        data[0] = trade_state_bump;
-
-        Ok(())
+    pub fn public_buy<'info>(
+        ctx: Context<'_, '_, '_, 'info, PublicBuy<'info>>,
+        trade_state_bump: u8,
+        escrow_payment_bump: u8,
+        buyer_price: u64,
+        token_size: u64,
+    ) -> ProgramResult {
+        public_bid(
+            ctx,
+            trade_state_bump,
+            escrow_payment_bump,
+            buyer_price,
+            token_size,
+        )
     }
 }
 
@@ -1129,58 +1048,19 @@ pub struct Sell<'info> {
     #[account(mut)]
     token_account: Account<'info, TokenAccount>,
     metadata: UncheckedAccount<'info>,
-    #[account(signer)]
-    authority: AccountInfo<'info>,
+    authority: UncheckedAccount<'info>,
     #[account(seeds=[PREFIX.as_bytes(), auction_house.creator.as_ref(), auction_house.treasury_mint.as_ref()], bump=auction_house.bump, has_one=authority, has_one=auction_house_fee_account)]
     auction_house: Account<'info, AuctionHouse>,
     #[account(mut, seeds=[PREFIX.as_bytes(), auction_house.key().as_ref(), FEE_PAYER.as_bytes()], bump=auction_house.fee_payer_bump)]
     auction_house_fee_account: UncheckedAccount<'info>,
     #[account(mut, seeds=[PREFIX.as_bytes(), wallet.key().as_ref(), auction_house.key().as_ref(), token_account.key().as_ref(), auction_house.treasury_mint.as_ref(), token_account.mint.as_ref(), &buyer_price.to_le_bytes(), &token_size.to_le_bytes()], bump=trade_state_bump)]
     seller_trade_state: UncheckedAccount<'info>,
-    #[account(
-				mut,
-				seeds=[
-						PREFIX.as_bytes(),
-						wallet.key().as_ref(),
-						auction_house.key().as_ref(),
-						token_account.key().as_ref(),
-						auction_house.treasury_mint.as_ref(),
-						token_account.mint.as_ref(),
-						&0u64.to_le_bytes(),
-						&token_size.to_le_bytes(),
-				],
-				bump=free_trade_state_bump,
-		)]
+    #[account(mut, seeds=[PREFIX.as_bytes(), wallet.key().as_ref(), auction_house.key().as_ref(), token_account.key().as_ref(), auction_house.treasury_mint.as_ref(), token_account.mint.as_ref(), &0u64.to_le_bytes(), &token_size.to_le_bytes()], bump=free_trade_state_bump)]
     free_seller_trade_state: UncheckedAccount<'info>,
     token_program: Program<'info, Token>,
     system_program: Program<'info, System>,
     #[account(seeds=[PREFIX.as_bytes(), SIGNER.as_bytes()], bump=program_as_signer_bump)]
     program_as_signer: UncheckedAccount<'info>,
-    rent: Sysvar<'info, Rent>,
-}
-
-#[derive(Accounts)]
-#[instruction(trade_state_bump: u8, escrow_payment_bump: u8, buyer_price: u64, token_size: u64)]
-pub struct Buy<'info> {
-    wallet: Signer<'info>,
-    #[account(mut)]
-    payment_account: UncheckedAccount<'info>,
-    transfer_authority: UncheckedAccount<'info>,
-    treasury_mint: Account<'info, Mint>,
-    token_account: Account<'info, TokenAccount>,
-    metadata: UncheckedAccount<'info>,
-    #[account(mut, seeds=[PREFIX.as_bytes(), auction_house.key().as_ref(), wallet.key().as_ref()], bump=escrow_payment_bump)]
-    escrow_payment_account: UncheckedAccount<'info>,
-    #[account(signer)]
-    authority: AccountInfo<'info>,
-    #[account(seeds=[PREFIX.as_bytes(), auction_house.creator.as_ref(), auction_house.treasury_mint.as_ref()], bump=auction_house.bump, has_one=authority, has_one=treasury_mint, has_one=auction_house_fee_account)]
-    auction_house: Account<'info, AuctionHouse>,
-    #[account(mut, seeds=[PREFIX.as_bytes(), auction_house.key().as_ref(), FEE_PAYER.as_bytes()], bump=auction_house.fee_payer_bump)]
-    auction_house_fee_account: UncheckedAccount<'info>,
-    #[account(mut, seeds=[PREFIX.as_bytes(), wallet.key().as_ref(), auction_house.key().as_ref(), token_account.key().as_ref(), treasury_mint.key().as_ref(), token_account.mint.as_ref(), &buyer_price.to_le_bytes(), &token_size.to_le_bytes()], bump=trade_state_bump)]
-    buyer_trade_state: UncheckedAccount<'info>,
-    token_program: Program<'info, Token>,
-    system_program: Program<'info, System>,
     rent: Sysvar<'info, Rent>,
 }
 
@@ -1204,15 +1084,14 @@ pub struct ExecuteSale<'info> {
     seller_payment_receipt_account: UncheckedAccount<'info>,
     #[account(mut)]
     buyer_receipt_token_account: UncheckedAccount<'info>,
-    #[account(signer)]
-    authority: AccountInfo<'info>,
+    authority: UncheckedAccount<'info>,
     #[account(seeds=[PREFIX.as_bytes(), auction_house.creator.as_ref(), auction_house.treasury_mint.as_ref()], bump=auction_house.bump, has_one=authority, has_one=treasury_mint, has_one=auction_house_treasury, has_one=auction_house_fee_account)]
-    auction_house: Account<'info, AuctionHouse>,
+    auction_house: Box<Account<'info, AuctionHouse>>,
     #[account(mut, seeds=[PREFIX.as_bytes(), auction_house.key().as_ref(), FEE_PAYER.as_bytes()], bump=auction_house.fee_payer_bump)]
     auction_house_fee_account: UncheckedAccount<'info>,
     #[account(mut, seeds=[PREFIX.as_bytes(), auction_house.key().as_ref(), TREASURY.as_bytes()], bump=auction_house.treasury_bump)]
     auction_house_treasury: UncheckedAccount<'info>,
-    #[account(mut, seeds=[PREFIX.as_bytes(), buyer.key().as_ref(), auction_house.key().as_ref(), token_account.key().as_ref(), auction_house.treasury_mint.as_ref(), token_mint.key().as_ref(), &buyer_price.to_le_bytes(), &token_size.to_le_bytes()], bump=buyer_trade_state.to_account_info().data.borrow()[0])]
+    #[account(mut)]
     buyer_trade_state: UncheckedAccount<'info>,
     #[account(mut, seeds=[PREFIX.as_bytes(), seller.key().as_ref(), auction_house.key().as_ref(), token_account.key().as_ref(), auction_house.treasury_mint.as_ref(), token_mint.key().as_ref(), &buyer_price.to_le_bytes(), &token_size.to_le_bytes()], bump=seller_trade_state.to_account_info().data.borrow()[0])]
     seller_trade_state: UncheckedAccount<'info>,
@@ -1236,8 +1115,7 @@ pub struct Deposit<'info> {
     #[account(mut, seeds=[PREFIX.as_bytes(), auction_house.key().as_ref(), wallet.key().as_ref()], bump=escrow_payment_bump)]
     escrow_payment_account: UncheckedAccount<'info>,
     treasury_mint: Account<'info, Mint>,
-    #[account(signer)]
-    authority: AccountInfo<'info>,
+    authority: UncheckedAccount<'info>,
     #[account(seeds=[PREFIX.as_bytes(), auction_house.creator.as_ref(), auction_house.treasury_mint.as_ref()], bump=auction_house.bump, has_one=authority, has_one=treasury_mint, has_one=auction_house_fee_account)]
     auction_house: Account<'info, AuctionHouse>,
     #[account(mut, seeds=[PREFIX.as_bytes(), auction_house.key().as_ref(), FEE_PAYER.as_bytes()], bump=auction_house.fee_payer_bump)]
@@ -1256,8 +1134,7 @@ pub struct Withdraw<'info> {
     #[account(mut, seeds=[PREFIX.as_bytes(), auction_house.key().as_ref(), wallet.key().as_ref()], bump=escrow_payment_bump)]
     escrow_payment_account: UncheckedAccount<'info>,
     treasury_mint: Account<'info, Mint>,
-    #[account(signer)]
-    authority: AccountInfo<'info>,
+    authority: UncheckedAccount<'info>,
     #[account(seeds=[PREFIX.as_bytes(), auction_house.creator.as_ref(), auction_house.treasury_mint.as_ref()], bump=auction_house.bump, has_one=authority, has_one=treasury_mint, has_one=auction_house_fee_account)]
     auction_house: Account<'info, AuctionHouse>,
     #[account(mut, seeds=[PREFIX.as_bytes(), auction_house.key().as_ref(), FEE_PAYER.as_bytes()], bump=auction_house.fee_payer_bump)]
@@ -1276,13 +1153,12 @@ pub struct Cancel<'info> {
     #[account(mut)]
     token_account: Account<'info, TokenAccount>,
     token_mint: Account<'info, Mint>,
-    #[account(signer)]
-    authority: AccountInfo<'info>,
+    authority: UncheckedAccount<'info>,
     #[account(seeds=[PREFIX.as_bytes(), auction_house.creator.as_ref(), auction_house.treasury_mint.as_ref()], bump=auction_house.bump, has_one=authority, has_one=auction_house_fee_account)]
     auction_house: Account<'info, AuctionHouse>,
     #[account(mut, seeds=[PREFIX.as_bytes(), auction_house.key().as_ref(), FEE_PAYER.as_bytes()], bump=auction_house.fee_payer_bump)]
     auction_house_fee_account: UncheckedAccount<'info>,
-    #[account(mut, seeds=[PREFIX.as_bytes(), wallet.key().as_ref(), auction_house.key().as_ref(), token_account.key().as_ref(), auction_house.treasury_mint.as_ref(), token_mint.key().as_ref(), &buyer_price.to_le_bytes(), &token_size.to_le_bytes()], bump=trade_state.to_account_info().data.borrow()[0])]
+    #[account(mut)]
     trade_state: UncheckedAccount<'info>,
     token_program: Program<'info, Token>,
 }
@@ -1292,7 +1168,7 @@ pub struct Cancel<'info> {
 pub struct CreateAuctionHouse<'info> {
     treasury_mint: Account<'info, Mint>,
     payer: Signer<'info>,
-    authority: AccountInfo<'info>,
+    authority: UncheckedAccount<'info>,
     #[account(mut)]
     fee_withdrawal_destination: UncheckedAccount<'info>,
     #[account(mut)]

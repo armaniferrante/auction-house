@@ -16,6 +16,7 @@ import {
 } from '@solana/spl-token';
 import * as metaplex from '@metaplex/js';
 import { IDL, AuctionHouse } from '../target/types/auction_house';
+
 const MetadataDataData = metaplex.programs.metadata.MetadataDataData;
 const CreateMetadata = metaplex.programs.metadata.CreateMetadata;
 
