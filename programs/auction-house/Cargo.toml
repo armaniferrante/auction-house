@@ -16,8 +16,10 @@ cpi = ["no-entrypoint"]
 default = []
 
 [dependencies]
-anchor-lang = "0.18.2"
-anchor-spl = "0.18.2"
+#anchor-lang = "0.20.1"
+#anchor-spl = "0.20.1"
+anchor-lang = { path = "../../../../lang" }
+anchor-spl = { path = "../../../../spl" }
 spl-token = { version = "3.2",  features = ["no-entrypoint"] }
 spl-associated-token-account = {version = "1.0.3", features = ["no-entrypoint"]}
 metaplex-token-metadata = {  version = "0.0.1", features = ["no-entrypoint"] }

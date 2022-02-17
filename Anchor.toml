@@ -1,3 +1,7 @@
+[features]
+seeds = true
+safety_checks = false
+
 [programs.localnet]
 auction_house = "hausS13jsjafwWwGqZTUQRmWyvyxn9EQpqMwV1PBBmk"
 
@@ -12,7 +16,7 @@ cluster = "localnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
-test = "ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
 
 [[test.genesis]]
 address = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
