@@ -1,21 +1,27 @@
-import * as assert from 'assert';
-import * as anchor from '@project-serum/anchor';
-import { Provider, Program, Wallet, BN, getProvider } from '@project-serum/anchor';
+import * as assert from "assert";
+import * as anchor from "@project-serum/anchor";
+import {
+  Provider,
+  Program,
+  Wallet,
+  BN,
+  getProvider,
+} from "@project-serum/anchor";
 import {
   Transaction,
   Keypair,
   PublicKey,
   SystemProgram,
   SYSVAR_RENT_PUBKEY,
-} from '@solana/web3.js';
+} from "@solana/web3.js";
 import {
   u64,
   Token,
   ASSOCIATED_TOKEN_PROGRAM_ID,
   TOKEN_PROGRAM_ID,
-} from '@solana/spl-token';
-import * as metaplex from '@metaplex/js';
-import { IDL, AuctionHouse } from '../target/types/auction_house';
+} from "@solana/spl-token";
+import * as metaplex from "@metaplex/js";
+import { IDL, AuctionHouse } from "../target/types/auction_house";
 
 const MetadataDataData = metaplex.programs.metadata.MetadataDataData;
 const CreateMetadata = metaplex.programs.metadata.CreateMetadata;
@@ -26,14 +32,16 @@ const TOKEN_METADATA_PROGRAM_ID = new PublicKey(
 
 const AUCTION_HOUSE_PROGRAM_ID = new PublicKey(
   "hausS13jsjafwWwGqZTUQRmWyvyxn9EQpqMwV1PBBmk"
-)
+);
 
 // Mint address for native SOL token accounts.
 //
 // The program uses this when one wants to pay with native SOL vs an SPL token.
-const NATIVE_SOL_MINT = new PublicKey('So11111111111111111111111111111111111111112');
+const NATIVE_SOL_MINT = new PublicKey(
+  "So11111111111111111111111111111111111111112"
+);
 
-describe('auction-house', () => {
+describe("auction-house", () => {
   anchor.setProvider(Provider.env());
 
   // Clients.
@@ -80,7 +88,7 @@ describe('auction-house', () => {
   const sellerWallet = Keypair.generate();
   let sellerTokenAccount: PublicKey;
 
-  it('Creates an NFT mint', async () => {
+  it("Creates an NFT mint", async () => {
     // Create the mint.
     nftMintClient = await Token.createMint(
       getProvider().connection,
@@ -89,7 +97,7 @@ describe('auction-house', () => {
       getProvider().wallet.publicKey,
       null,
       6,
-      tokenProgram,
+      tokenProgram
     );
 
     // Create the metadata.
@@ -99,44 +107,51 @@ describe('auction-house', () => {
         TOKEN_METADATA_PROGRAM_ID.toBuffer(),
         nftMintClient.publicKey.toBuffer(),
       ],
-      TOKEN_METADATA_PROGRAM_ID,
+      TOKEN_METADATA_PROGRAM_ID
     );
     metadata = _metadata;
-    const tx = new CreateMetadata({ feePayer: getProvider().wallet.publicKey }, {
-      metadata,
-      metadataData: new MetadataDataData({
-        name: 'test-nft',
-        symbol: 'TEST',
-        uri: 'https://nothing.com',
-        sellerFeeBasisPoints: 1,
-        creators: null,
-      }),
-      updateAuthority: getProvider().wallet.publicKey,
-      mint: nftMintClient.publicKey,
-      mintAuthority: getProvider().wallet.publicKey,
-    });
+    const tx = new CreateMetadata(
+      { feePayer: getProvider().wallet.publicKey },
+      {
+        metadata,
+        metadataData: new MetadataDataData({
+          name: "test-nft",
+          symbol: "TEST",
+          uri: "https://nothing.com",
+          sellerFeeBasisPoints: 1,
+          creators: null,
+        }),
+        updateAuthority: getProvider().wallet.publicKey,
+        mint: nftMintClient.publicKey,
+        mintAuthority: getProvider().wallet.publicKey,
+      }
+    );
     await getProvider().send(tx);
   });
 
-  it('Creates token accounts for the NFT', async () => {
+  it("Creates token accounts for the NFT", async () => {
     // Create token accounts for the mint.
-    buyerTokenAccount = await nftMintClient.createAssociatedTokenAccount(buyerWallet.publicKey);
-    sellerTokenAccount = await nftMintClient.createAssociatedTokenAccount(sellerWallet.publicKey);
+    buyerTokenAccount = await nftMintClient.createAssociatedTokenAccount(
+      buyerWallet.publicKey
+    );
+    sellerTokenAccount = await nftMintClient.createAssociatedTokenAccount(
+      sellerWallet.publicKey
+    );
 
     // Initialize the seller's account with a single token.
     await nftMintClient.mintTo(
       sellerTokenAccount,
       getProvider().wallet.publicKey,
       [],
-      1,
+      1
     );
   });
 
-  it('Creates auction house program clients representing the buyer and seller', async () => {
+  it("Creates auction house program clients representing the buyer and seller", async () => {
     authorityClient = new Program<AuctionHouse>(
       IDL,
       AUCTION_HOUSE_PROGRAM_ID,
-      getProvider(),
+      getProvider()
     );
     sellerClient = new Program<AuctionHouse>(
       IDL,
@@ -144,8 +159,8 @@ describe('auction-house', () => {
       new Provider(
         getProvider().connection,
         new Wallet(sellerWallet),
-        Provider.defaultOptions(),
-      ),
+        Provider.defaultOptions()
+      )
     );
     buyerClient = new Program<AuctionHouse>(
       IDL,
@@ -153,51 +168,40 @@ describe('auction-house', () => {
       new Provider(
         getProvider().connection,
         new Wallet(buyerWallet),
-        Provider.defaultOptions(),
-      ),
+        Provider.defaultOptions()
+      )
     );
   });
 
-  it('Initializes constants', async () => {
+  it("Initializes constants", async () => {
     const [_auctionHouse, _bump] = await PublicKey.findProgramAddress(
-      [
-        PREFIX,
-        authority.toBuffer(),
-        treasuryMint.toBuffer(),
-      ],
-      AUCTION_HOUSE_PROGRAM_ID,
+      [PREFIX, authority.toBuffer(), treasuryMint.toBuffer()],
+      AUCTION_HOUSE_PROGRAM_ID
     );
-    const [_auctionHouseFeeAccount,_auctionHouseFeeAccountBump] = await PublicKey.findProgramAddress(
-      [
-        PREFIX,
-        _auctionHouse.toBuffer(),
-        FEE_PAYER,
-      ],
-      AUCTION_HOUSE_PROGRAM_ID,
+    const [
+      _auctionHouseFeeAccount,
+      _auctionHouseFeeAccountBump,
+    ] = await PublicKey.findProgramAddress(
+      [PREFIX, _auctionHouse.toBuffer(), FEE_PAYER],
+      AUCTION_HOUSE_PROGRAM_ID
     );
-    const [_auctionHouseTreasury,  _auctionHouseTreasuryBump] = await PublicKey.findProgramAddress(
-      [
-        PREFIX,
-        _auctionHouse.toBuffer(),
-        TREASURY,
-      ],
-      AUCTION_HOUSE_PROGRAM_ID,
+    const [
+      _auctionHouseTreasury,
+      _auctionHouseTreasuryBump,
+    ] = await PublicKey.findProgramAddress(
+      [PREFIX, _auctionHouse.toBuffer(), TREASURY],
+      AUCTION_HOUSE_PROGRAM_ID
     );
     const [_buyerEscrow, _buyerEscrowBump] = await PublicKey.findProgramAddress(
-      [
-        PREFIX,
-        _auctionHouse.toBuffer(),
-        buyerWallet.publicKey.toBuffer()
-      ],
-      AUCTION_HOUSE_PROGRAM_ID,
+      [PREFIX, _auctionHouse.toBuffer(), buyerWallet.publicKey.toBuffer()],
+      AUCTION_HOUSE_PROGRAM_ID
     );
-    const [_programAsSigner, _programAsSignerBump] = await
-    PublicKey.findProgramAddress(
-      [
-        PREFIX,
-        SIGNER,
-      ],
-      AUCTION_HOUSE_PROGRAM_ID,
+    const [
+      _programAsSigner,
+      _programAsSignerBump,
+    ] = await PublicKey.findProgramAddress(
+      [PREFIX, SIGNER],
+      AUCTION_HOUSE_PROGRAM_ID
     );
 
     auctionHouse = _auctionHouse;
@@ -212,71 +216,72 @@ describe('auction-house', () => {
     programAsSignerBump = _programAsSignerBump;
   });
 
-  it('Funds the buyer with lamports so that it can bid', async () => {
+  it("Funds the buyer with lamports so that it can bid", async () => {
     const tx = new Transaction();
     tx.add(
       SystemProgram.transfer({
         fromPubkey: authority,
         toPubkey: buyerWallet.publicKey,
-        lamports: 20*10**9,
-      }),
+        lamports: 20 * 10 ** 9,
+      })
     );
     tx.add(
       SystemProgram.transfer({
         fromPubkey: authority,
         toPubkey: sellerWallet.publicKey,
-        lamports: 20*10**9,
-      }),
+        lamports: 20 * 10 ** 9,
+      })
     );
     tx.add(
       SystemProgram.transfer({
         fromPubkey: authority,
         toPubkey: auctionHouseFeeAccount,
-        lamports: 100*10**9,
-      }),
+        lamports: 100 * 10 ** 9,
+      })
     );
     const txSig = await getProvider().send(tx);
-    console.log('fund buyer:', txSig);
+    console.log("fund buyer:", txSig);
   });
 
-  it('Creates an auction house', async () => {
+  it("Creates an auction house", async () => {
     const sellerFeeBasisPoints = 1;
     const requiresSignOff = true;
     const canChangeSalePrice = true;
 
-    const txSig = await authorityClient.rpc.createAuctionHouse(
-      bump,
-      auctionHouseFeeAccountBump,
-      auctionHouseTreasuryBump,
-      sellerFeeBasisPoints,
-      requiresSignOff,
-      canChangeSalePrice,
-      {
-        accounts: {
-          treasuryMint,
-          payer: authority,
-          authority,
-          feeWithdrawalDestination,
-          treasuryWithdrawalDestination,
-          treasuryWithdrawalDestinationOwner,
-          auctionHouse,
-          auctionHouseFeeAccount,
-          auctionHouseTreasury,
-          tokenProgram,
-          systemProgram,
-          ataProgram,
-          rent,
-        },
-      }
-    );
+    const txSig = await authorityClient.methods
+      .createAuctionHouse(
+        bump,
+        auctionHouseFeeAccountBump,
+        auctionHouseTreasuryBump,
+        sellerFeeBasisPoints,
+        requiresSignOff,
+        canChangeSalePrice
+      )
+      .accounts({
+        treasuryMint,
+        payer: authority,
+        authority,
+        feeWithdrawalDestination,
+        treasuryWithdrawalDestination,
+        treasuryWithdrawalDestinationOwner,
+        auctionHouse,
+        auctionHouseFeeAccount,
+        auctionHouseTreasury,
+        tokenProgram,
+        systemProgram,
+        ataProgram,
+        rent,
+      })
+      .rpc();
 
-    console.log('createAuctionHouse:', txSig);
+    console.log("createAuctionHouse:", txSig);
   });
 
-  it('Deposits into an escrow account', async () => {
-    const amount = new BN(10*10**9);
-    const txSig = await buyerClient.rpc.deposit(buyerEscrowBump, amount, {
-      accounts: {
+  it("Deposits into an escrow account", async () => {
+    const amount = new BN(10 * 10 ** 9);
+    const txSig = await buyerClient.methods
+      .deposit(buyerEscrowBump, amount)
+      .accounts({
         wallet: buyerWallet.publicKey,
         paymentAccount: buyerWallet.publicKey,
         transferAuthority: buyerWallet.publicKey,
@@ -288,17 +293,18 @@ describe('auction-house', () => {
         tokenProgram,
         systemProgram,
         rent,
-      },
+      })
       // @ts-ignore
-      signers: [authorityClient.provider.wallet.payer],
-    });
-    console.log('deposit:', txSig);
+      .signers([authorityClient.provider.wallet.payer])
+      .rpc();
+    console.log("deposit:", txSig);
   });
 
-  it('Withdraws from an escrow account', async () => {
-    const amount = new BN(10*10**9);
-    const txSig = await buyerClient.rpc.withdraw(buyerEscrowBump, amount, {
-      accounts: {
+  it("Withdraws from an escrow account", async () => {
+    const amount = new BN(10 * 10 ** 9);
+    const txSig = await buyerClient.methods
+      .withdraw(buyerEscrowBump, amount)
+      .accounts({
         wallet: buyerWallet.publicKey,
         receiptAccount: buyerWallet.publicKey,
         escrowPaymentAccount: buyerEscrow,
@@ -310,18 +316,22 @@ describe('auction-house', () => {
         systemProgram,
         ataProgram,
         rent,
-      },
+      })
+
       // @ts-ignore
-      signers: [authorityClient.provider.wallet.payer],
-    });
-    console.log('withdraw:', txSig);
+      .signers([authorityClient.provider.wallet.payer])
+      .rpc();
+    console.log("withdraw:", txSig);
   });
 
-  it('Posts an offer', async () => {
-    const buyerPrice = new u64(2*10**9);
+  it("Posts an offer", async () => {
+    const buyerPrice = new u64(2 * 10 ** 9);
     const tokenSize = new u64(1);
     const zero = new u64(0);
-    const [sellerTradeState, sellerTradeStateBump] = await PublicKey.findProgramAddress(
+    const [
+      sellerTradeState,
+      sellerTradeStateBump,
+    ] = await PublicKey.findProgramAddress(
       [
         PREFIX,
         sellerWallet.publicKey.toBuffer(),
@@ -332,9 +342,12 @@ describe('auction-house', () => {
         buyerPrice.toBuffer(),
         tokenSize.toBuffer(),
       ],
-      AUCTION_HOUSE_PROGRAM_ID,
+      AUCTION_HOUSE_PROGRAM_ID
     );
-    const [freeSellerTradeState, freeSellerTradeStateBump] = await PublicKey.findProgramAddress(
+    const [
+      freeSellerTradeState,
+      freeSellerTradeStateBump,
+    ] = await PublicKey.findProgramAddress(
       [
         PREFIX,
         sellerWallet.publicKey.toBuffer(),
@@ -345,38 +358,39 @@ describe('auction-house', () => {
         zero.toBuffer(),
         tokenSize.toBuffer(),
       ],
-      AUCTION_HOUSE_PROGRAM_ID,
+      AUCTION_HOUSE_PROGRAM_ID
     );
-    const txSig = await sellerClient.rpc.sell(
-      sellerTradeStateBump,
-      freeSellerTradeStateBump,
-      programAsSignerBump,
-      buyerPrice,
-      tokenSize,
-      {
-        accounts: {
-          wallet: sellerWallet.publicKey,
-          tokenAccount: sellerTokenAccount,
-          metadata,
-          authority,
-          auctionHouse,
-          auctionHouseFeeAccount,
-          sellerTradeState,
-          freeSellerTradeState,
-          tokenProgram,
-          systemProgram,
-          programAsSigner,
-          rent,
-        },
+    const txSig = await sellerClient.methods
+      .sell(
+        sellerTradeStateBump,
+        freeSellerTradeStateBump,
+        programAsSignerBump,
+        buyerPrice,
+        tokenSize
+      )
+      .accounts({
+        wallet: sellerWallet.publicKey,
+        tokenAccount: sellerTokenAccount,
+        metadata,
+        authority,
+        auctionHouse,
+        auctionHouseFeeAccount,
+        sellerTradeState,
+        freeSellerTradeState,
+        tokenProgram,
+        systemProgram,
+        programAsSigner,
+        rent,
+      })
       // @ts-ignore
-      signers: [authorityClient.provider.wallet.payer],
-      },
-    );
-    console.log('sell:', txSig);
+      .signers([authorityClient.provider.wallet.payer])
+      .rpc();
+
+    console.log("sell:", txSig);
   });
 
-  it('Cancels an offer', async () => {
-    const buyerPrice = new u64(2*10**9);
+  it("Cancels an offer", async () => {
+    const buyerPrice = new u64(2 * 10 ** 9);
     const tokenSize = new u64(1);
     const [tradeState] = await PublicKey.findProgramAddress(
       [
@@ -389,34 +403,34 @@ describe('auction-house', () => {
         buyerPrice.toBuffer(),
         tokenSize.toBuffer(),
       ],
-      AUCTION_HOUSE_PROGRAM_ID,
+      AUCTION_HOUSE_PROGRAM_ID
     );
-    const txSig = await sellerClient.rpc.cancel(
-      buyerPrice,
-      tokenSize,
-      {
-        accounts: {
-          wallet: sellerWallet.publicKey,
-          tokenAccount: sellerTokenAccount,
-          tokenMint: nftMintClient.publicKey,
-          authority,
-          auctionHouse,
-          auctionHouseFeeAccount,
-          tradeState,
-          tokenProgram,
-        },
-        // @ts-ignore
-        signers: [authorityClient.provider.wallet.payer],
-      }
-    );
-    console.log('cancel:', txSig);
+    const txSig = await sellerClient.methods
+      .cancel(buyerPrice, tokenSize)
+      .accounts({
+        wallet: sellerWallet.publicKey,
+        tokenAccount: sellerTokenAccount,
+        tokenMint: nftMintClient.publicKey,
+        authority,
+        auctionHouse,
+        auctionHouseFeeAccount,
+        tradeState,
+        tokenProgram,
+      })
+      // @ts-ignore
+      .signers([authorityClient.provider.wallet.payer])
+      .rpc();
+    console.log("cancel:", txSig);
   });
 
-  it('Posts an offer (again)', async () => {
-    const buyerPrice = new u64(2*10**9);
+  it("Posts an offer (again)", async () => {
+    const buyerPrice = new u64(2 * 10 ** 9);
     const tokenSize = new u64(1);
     const zero = new u64(0);
-    const [sellerTradeState, sellerTradeStateBump] = await PublicKey.findProgramAddress(
+    const [
+      sellerTradeState,
+      sellerTradeStateBump,
+    ] = await PublicKey.findProgramAddress(
       [
         PREFIX,
         sellerWallet.publicKey.toBuffer(),
@@ -427,9 +441,12 @@ describe('auction-house', () => {
         buyerPrice.toBuffer(),
         tokenSize.toBuffer(),
       ],
-      AUCTION_HOUSE_PROGRAM_ID,
+      AUCTION_HOUSE_PROGRAM_ID
     );
-    const [freeSellerTradeState, freeSellerTradeStateBump] = await PublicKey.findProgramAddress(
+    const [
+      freeSellerTradeState,
+      freeSellerTradeStateBump,
+    ] = await PublicKey.findProgramAddress(
       [
         PREFIX,
         sellerWallet.publicKey.toBuffer(),
@@ -440,40 +457,43 @@ describe('auction-house', () => {
         zero.toBuffer(),
         tokenSize.toBuffer(),
       ],
-      AUCTION_HOUSE_PROGRAM_ID,
+      AUCTION_HOUSE_PROGRAM_ID
     );
-    const txSig = await sellerClient.rpc.sell(
-      sellerTradeStateBump,
-      freeSellerTradeStateBump,
-      programAsSignerBump,
-      buyerPrice,
-      tokenSize,
-      {
-        accounts: {
-          wallet: sellerWallet.publicKey,
-          tokenAccount: sellerTokenAccount,
-          metadata,
-          authority,
-          auctionHouse,
-          auctionHouseFeeAccount,
-          sellerTradeState,
-          freeSellerTradeState,
-          tokenProgram,
-          systemProgram,
-          programAsSigner,
-          rent,
-        },
+    const txSig = await sellerClient.methods
+      .sell(
+        sellerTradeStateBump,
+        freeSellerTradeStateBump,
+        programAsSignerBump,
+        buyerPrice,
+        tokenSize
+      )
+      .accounts({
+        wallet: sellerWallet.publicKey,
+        tokenAccount: sellerTokenAccount,
+        metadata,
+        authority,
+        auctionHouse,
+        auctionHouseFeeAccount,
+        sellerTradeState,
+        freeSellerTradeState,
+        tokenProgram,
+        systemProgram,
+        programAsSigner,
+        rent,
+      })
       // @ts-ignore
-      signers: [authorityClient.provider.wallet.payer],
-      },
-    );
-    console.log('sell:', txSig);
+      .signers([authorityClient.provider.wallet.payer])
+      .rpc();
+    console.log("sell:", txSig);
   });
 
-  it('Posts a bid', async () => {
-    const buyerPrice = new u64(2*10**9);
+  it("Posts a bid", async () => {
+    const buyerPrice = new u64(2 * 10 ** 9);
     const tokenSize = new u64(1);
-    const [buyerTradeState, buyerTradeStateBump] = await PublicKey.findProgramAddress(
+    const [
+      buyerTradeState,
+      buyerTradeStateBump,
+    ] = await PublicKey.findProgramAddress(
       [
         PREFIX,
         buyerWallet.publicKey.toBuffer(),
@@ -484,47 +504,50 @@ describe('auction-house', () => {
         buyerPrice.toBuffer(),
         tokenSize.toBuffer(),
       ],
-      AUCTION_HOUSE_PROGRAM_ID,
+      AUCTION_HOUSE_PROGRAM_ID
     );
-    const txSig = await buyerClient.rpc.buy(
-      buyerTradeStateBump,
-      buyerEscrowBump,
-      buyerPrice,
-      tokenSize,
-      {
-        accounts: {
-          wallet: buyerWallet.publicKey,
-          paymentAccount: buyerWallet.publicKey,
-          transferAuthority: buyerWallet.publicKey,
-          treasuryMint,
-          tokenAccount: sellerTokenAccount,
-          metadata,
-          escrowPaymentAccount: buyerEscrow,
-          authority,
-          auctionHouse,
-          auctionHouseFeeAccount,
-          buyerTradeState,
-          tokenProgram,
-          systemProgram,
-          rent,
-        },
+    const txSig = await buyerClient.methods
+      .buy(buyerTradeStateBump, buyerEscrowBump, buyerPrice, tokenSize)
+      .accounts({
+        wallet: buyerWallet.publicKey,
+        paymentAccount: buyerWallet.publicKey,
+        transferAuthority: buyerWallet.publicKey,
+        treasuryMint,
+        tokenAccount: sellerTokenAccount,
+        metadata,
+        escrowPaymentAccount: buyerEscrow,
+        authority,
+        auctionHouse,
+        auctionHouseFeeAccount,
+        buyerTradeState,
+        tokenProgram,
+        systemProgram,
+        rent,
+      })
       // @ts-ignore
-      signers: [authorityClient.provider.wallet.payer],
-      },
-    );
-    console.log('buy:', txSig);
+      .signers([authorityClient.provider.wallet.payer])
+      .rpc();
+
+    console.log("buy:", txSig);
   });
 
-  it('Executes a trades', async () => {
+  it("Executes a trades", async () => {
     // Before state.
-    const beforeEscrowState = await authorityClient.provider.connection.getAccountInfo(buyerEscrow);
-    const beforeSeller = await authorityClient.provider.connection.getAccountInfo(sellerWallet.publicKey);
+    const beforeEscrowState = await authorityClient.provider.connection.getAccountInfo(
+      buyerEscrow
+    );
+    const beforeSeller = await authorityClient.provider.connection.getAccountInfo(
+      sellerWallet.publicKey
+    );
 
     // Execute trade.
-    const buyerPrice = new u64(2*10**9);
+    const buyerPrice = new u64(2 * 10 ** 9);
     const tokenSize = new u64(1);
     const zero = new u64(0);
-    const [buyerTradeState, buyerTradeStateBump] = await PublicKey.findProgramAddress(
+    const [
+      buyerTradeState,
+      buyerTradeStateBump,
+    ] = await PublicKey.findProgramAddress(
       [
         PREFIX,
         buyerWallet.publicKey.toBuffer(),
@@ -535,7 +558,7 @@ describe('auction-house', () => {
         buyerPrice.toBuffer(),
         tokenSize.toBuffer(),
       ],
-      AUCTION_HOUSE_PROGRAM_ID,
+      AUCTION_HOUSE_PROGRAM_ID
     );
     const [sellerTradeState] = await PublicKey.findProgramAddress(
       [
@@ -548,9 +571,12 @@ describe('auction-house', () => {
         buyerPrice.toBuffer(),
         tokenSize.toBuffer(),
       ],
-      AUCTION_HOUSE_PROGRAM_ID,
+      AUCTION_HOUSE_PROGRAM_ID
     );
-    const [freeSellerTradeState, freeSellerTradeStateBump] = await PublicKey.findProgramAddress(
+    const [
+      freeSellerTradeState,
+      freeSellerTradeStateBump,
+    ] = await PublicKey.findProgramAddress(
       [
         PREFIX,
         sellerWallet.publicKey.toBuffer(),
@@ -561,119 +587,123 @@ describe('auction-house', () => {
         zero.toBuffer(),
         tokenSize.toBuffer(),
       ],
-      AUCTION_HOUSE_PROGRAM_ID,
+      AUCTION_HOUSE_PROGRAM_ID
     );
-    const txSig = await authorityClient.rpc.executeSale(
-      buyerEscrowBump,
-      freeSellerTradeStateBump,
-      programAsSignerBump,
-      buyerPrice,
-      tokenSize,
-      {
-        accounts: {
-          buyer: buyerWallet.publicKey,
-          seller: sellerWallet.publicKey,
-          tokenAccount: sellerTokenAccount,
-          tokenMint: nftMintClient.publicKey,
-          metadata,
-          treasuryMint,
-          escrowPaymentAccount: buyerEscrow,
-          sellerPaymentReceiptAccount: sellerWallet.publicKey,
-          buyerReceiptTokenAccount: buyerTokenAccount,
-          authority,
-          auctionHouse,
-          auctionHouseFeeAccount,
-          auctionHouseTreasury,
-          buyerTradeState,
-          sellerTradeState,
-          freeTradeState: freeSellerTradeState,
-          tokenProgram,
-          systemProgram,
-          ataProgram,
-          programAsSigner,
-          rent,
-        },
-      }
-    );
-    console.log('executeSale:', txSig);
+    const txSig = await authorityClient.methods
+      .executeSale(
+        buyerEscrowBump,
+        freeSellerTradeStateBump,
+        programAsSignerBump,
+        buyerPrice,
+        tokenSize
+      )
+      .accounts({
+        buyer: buyerWallet.publicKey,
+        seller: sellerWallet.publicKey,
+        tokenAccount: sellerTokenAccount,
+        tokenMint: nftMintClient.publicKey,
+        metadata,
+        treasuryMint,
+        escrowPaymentAccount: buyerEscrow,
+        sellerPaymentReceiptAccount: sellerWallet.publicKey,
+        buyerReceiptTokenAccount: buyerTokenAccount,
+        authority,
+        auctionHouse,
+        auctionHouseFeeAccount,
+        auctionHouseTreasury,
+        buyerTradeState,
+        sellerTradeState,
+        freeTradeState: freeSellerTradeState,
+        tokenProgram,
+        systemProgram,
+        ataProgram,
+        programAsSigner,
+        rent,
+      })
+      .rpc();
+
+    console.log("executeSale:", txSig);
 
     // After state.
-    const afterEscrowState = await authorityClient.provider.connection.getAccountInfo(buyerEscrow);
-    const afterSeller = await authorityClient.provider.connection.getAccountInfo(sellerWallet.publicKey);
-
+    const afterEscrowState = await authorityClient.provider.connection.getAccountInfo(
+      buyerEscrow
+    );
+    const afterSeller = await authorityClient.provider.connection.getAccountInfo(
+      sellerWallet.publicKey
+    );
 
     // Assertions.
     assert.ok(afterEscrowState === null);
-    assert.ok(beforeEscrowState.lamports === 2*10**9);
-    assert.ok(1999800000.0 === afterSeller.lamports-beforeSeller.lamports); // 1bp fee.
+    assert.ok(beforeEscrowState.lamports === 2 * 10 ** 9);
+    assert.ok(1999800000.0 === afterSeller.lamports - beforeSeller.lamports); // 1bp fee.
   });
 
-  it('Withdraws from the fee account', async () => {
-    const txSig = await authorityClient.rpc.withdrawFromFee(
-      new u64(1),
-      {
-        accounts: {
-          authority,
-          feeWithdrawalDestination,
-          auctionHouseFeeAccount,
-          auctionHouse,
-          systemProgram,
-        },
-      }
-    );
-    console.log('withdrawFromFee:', txSig);
+  it("Withdraws from the fee account", async () => {
+    const txSig = await authorityClient.methods
+      .withdrawFromFee(new u64(1))
+      .accounts({
+        authority,
+        feeWithdrawalDestination,
+        auctionHouseFeeAccount,
+        auctionHouse,
+        systemProgram,
+      })
+      .rpc();
+    console.log("withdrawFromFee:", txSig);
   });
 
-  it('Withdraws from the treasury account', async () => {
-    const txSig = await authorityClient.rpc.withdrawFromTreasury(
-      new u64(1),
-      {
-        accounts: {
-          treasuryMint,
-          authority,
-          treasuryWithdrawalDestination,
-          auctionHouseTreasury,
-          auctionHouse,
-          tokenProgram,
-          systemProgram,
-        }
-      },
-    );
-    console.log('txSig:', txSig);
+  it("Withdraws from the treasury account", async () => {
+    const txSig = await authorityClient.methods
+      .withdrawFromTreasury(new u64(1))
+      .accounts({
+        treasuryMint,
+        authority,
+        treasuryWithdrawalDestination,
+        auctionHouseTreasury,
+        auctionHouse,
+        tokenProgram,
+        systemProgram,
+      })
+      .rpc();
+
+    console.log("txSig:", txSig);
   });
 
-  it('Updates an auction house', async () => {
+  it("Updates an auction house", async () => {
     const sellerFeeBasisPoints = 2;
     const requiresSignOff = true;
     const canChangeSalePrice = null;
     const tx = new Transaction();
     tx.add(
-       authorityClient.instruction.updateAuctionHouse(
-        sellerFeeBasisPoints,
-        requiresSignOff,
-        canChangeSalePrice,
-        {
-          accounts: {
-            treasuryMint,
-            payer: authority,
-            authority,
-            newAuthority: authority,
-            feeWithdrawalDestination,
-            treasuryWithdrawalDestination,
-            treasuryWithdrawalDestinationOwner,
-            auctionHouse,
-            tokenProgram,
-            systemProgram,
-            ataProgram,
-            rent,
-          }
-        }
-      )
+      await authorityClient.methods
+        .updateAuctionHouse(
+          sellerFeeBasisPoints,
+          requiresSignOff,
+          canChangeSalePrice
+        )
+        .accounts({
+          treasuryMint,
+          payer: authority,
+          authority,
+          newAuthority: authority,
+          feeWithdrawalDestination,
+          treasuryWithdrawalDestination,
+          treasuryWithdrawalDestinationOwner,
+          auctionHouse,
+          tokenProgram,
+          systemProgram,
+          ataProgram,
+          rent,
+        })
+        .instruction()
     );
-    const txSig = await authorityClient.provider.send(tx);
-    console.log('updateAuctionHouse:', txSig);
 
-    const newAh = await authorityClient.account.auctionHouse.fetch(auctionHouse);
+    const txSig = await authorityClient.provider.send(tx);
+    console.log("updateAuctionHouse:", txSig);
+
+    const newAh = await authorityClient.account.auctionHouse.fetch(
+      auctionHouse
+    );
     assert.ok(newAh.sellerFeeBasisPoints === 2);
   });
 });
