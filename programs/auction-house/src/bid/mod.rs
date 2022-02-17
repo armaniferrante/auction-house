@@ -77,7 +77,8 @@ pub struct Buy<'info> {
     metadata: UncheckedAccount<'info>,
     #[account(mut, seeds = [PREFIX.as_bytes(), auction_house.key().as_ref(), wallet.key().as_ref()], bump = escrow_payment_bump)]
     escrow_payment_account: UncheckedAccount<'info>,
-    authority: UncheckedAccount<'info>,
+    #[account(signer)]
+    authority: AccountInfo<'info>,
     #[account(seeds = [PREFIX.as_bytes(), auction_house.creator.as_ref(), auction_house.treasury_mint.as_ref()], bump = auction_house.bump, has_one = authority, has_one = treasury_mint, has_one = auction_house_fee_account)]
     auction_house: Account<'info, AuctionHouse>,
     #[account(mut, seeds = [PREFIX.as_bytes(), auction_house.key().as_ref(), FEE_PAYER.as_bytes()], bump = auction_house.fee_payer_bump)]
@@ -104,7 +105,7 @@ pub fn private_bid<'info>(
         ctx.accounts.token_account.to_owned(),
         ctx.accounts.metadata.to_owned(),
         ctx.accounts.escrow_payment_account.to_owned(),
-        ctx.accounts.authority.to_owned(),
+        UncheckedAccount::try_from(ctx.accounts.authority.clone()),
         ctx.accounts.auction_house.to_owned(),
         ctx.accounts.auction_house_fee_account.to_owned(),
         ctx.accounts.buyer_trade_state.to_owned(),
