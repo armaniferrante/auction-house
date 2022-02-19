@@ -708,7 +708,9 @@ pub mod auction_house {
         let is_native = treasury_mint.key() == spl_token::native_mint::id();
 
         if buyer_price == 0 && !authority_clone.is_signer && !seller.is_signer {
-            return Err(error!(ErrorCode::CannotMatchFreeSalesWithoutAuctionHouseOrSellerSignoff));
+            return Err(error!(
+                ErrorCode::CannotMatchFreeSalesWithoutAuctionHouseOrSellerSignoff
+            ));
         }
 
         let token_account_mint = get_mint_from_token_account(&token_account_clone)?;
@@ -1702,7 +1704,7 @@ pub struct AuctionHouse {
 
 pub const TRADE_STATE_SIZE: usize = 1;
 
-#[error_codes]
+#[error_code]
 pub enum ErrorCode {
     #[msg("PublicKeyMismatch")]
     PublicKeyMismatch,
