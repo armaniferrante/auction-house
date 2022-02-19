@@ -20,7 +20,7 @@ pub fn assert_is_ata(
     ata: &AccountInfo,
     wallet: &Pubkey,
     mint: &Pubkey,
-) -> Result<Account, ProgramError> {
+) -> Result<Account> {
     assert_owned_by(ata, &spl_token::id())?;
     let ata_account: Account = assert_initialized(ata)?;
     assert_keys_equal(ata_account.owner, *wallet)?;
@@ -38,7 +38,7 @@ pub fn make_ata<'a>(
     system_program: AccountInfo<'a>,
     rent: AccountInfo<'a>,
     fee_payer_seeds: &[&[u8]],
-) -> ProgramResult {
+) -> Result<()> {
     let seeds: &[&[&[u8]]];
     let as_arr = [fee_payer_seeds];
 
@@ -73,7 +73,7 @@ pub fn make_ata<'a>(
 pub fn assert_metadata_valid<'a>(
     metadata: &UncheckedAccount,
     token_account: &anchor_lang::accounts::account::Account<'a, TokenAccount>,
-) -> ProgramResult {
+) -> Result<()> {
     assert_derivation(
         &metaplex_token_metadata::id(),
         &metadata.to_account_info(),
@@ -85,7 +85,7 @@ pub fn assert_metadata_valid<'a>(
     )?;
 
     if metadata.data_is_empty() {
-        return Err(ErrorCode::MetadataDoesntExist.into());
+        return Err(error!(ErrorCode::MetadataDoesntExist));
     }
     Ok(())
 }
@@ -96,7 +96,7 @@ pub fn get_fee_payer<'a, 'b>(
     wallet: AccountInfo<'a>,
     auction_house_fee_account: AccountInfo<'a>,
     auction_house_seeds: &'b [&'b [u8]],
-) -> Result<(AccountInfo<'a>, &'b [&'b [u8]]), ProgramError> {
+) -> Result<(AccountInfo<'a>, &'b [&'b [u8]])> {
     let mut seeds: &[&[u8]] = &[];
     let fee_payer: AccountInfo;
     if authority.to_account_info().is_signer {
@@ -104,11 +104,11 @@ pub fn get_fee_payer<'a, 'b>(
         fee_payer = auction_house_fee_account;
     } else if wallet.is_signer {
         if auction_house.requires_sign_off {
-            return Err(ErrorCode::CannotTakeThisActionWithoutAuctionHouseSignOff.into());
+            return Err(error!(ErrorCode::CannotTakeThisActionWithoutAuctionHouseSignOff));
         }
         fee_payer = wallet
     } else {
-        return Err(ErrorCode::NoPayerPresent.into());
+        return Err(error!(ErrorCode::NoPayerPresent));
     };
 
     Ok((fee_payer, &seeds))
@@ -122,7 +122,7 @@ pub fn assert_valid_delegation(
     transfer_authority: &AccountInfo,
     mint: &anchor_lang::accounts::account::Account<Mint>,
     paysize: u64,
-) -> ProgramResult {
+) -> Result<()> {
     match Account::unpack(&src_account.data.borrow()) {
         Ok(token_account) => {
             // Ensure that the delegated amount is exactly equal to the maker_size
@@ -132,12 +132,12 @@ pub fn assert_valid_delegation(
             );
             msg!("Delegated Amount {}", token_account.delegated_amount);
             if token_account.delegated_amount != paysize {
-                return Err(ProgramError::InvalidAccountData);
+                return Err(ProgramError::InvalidAccountData.into());
             }
             // Ensure that authority is the delegate of this token account
             msg!("Authority key matches");
             if token_account.delegate != COption::Some(*transfer_authority.key) {
-                return Err(ProgramError::InvalidAccountData);
+                return Err(ProgramError::InvalidAccountData.into());
             }
 
             msg!("Delegate matches");
@@ -147,11 +147,11 @@ pub fn assert_valid_delegation(
         }
         Err(_) => {
             if mint.key() != spl_token::native_mint::id() {
-                return Err(ErrorCode::ExpectedSolAccount.into());
+                return Err(error!(ErrorCode::ExpectedSolAccount));
             }
 
             if !src_wallet.is_signer {
-                return Err(ErrorCode::SOLWalletMustSign.into());
+                return Err(error!(ErrorCode::SOLWalletMustSign));
             }
 
             assert_keys_equal(*src_wallet.key, src_account.key())?;
@@ -162,9 +162,9 @@ pub fn assert_valid_delegation(
     Ok(())
 }
 
-pub fn assert_keys_equal(key1: Pubkey, key2: Pubkey) -> ProgramResult {
+pub fn assert_keys_equal(key1: Pubkey, key2: Pubkey) -> Result<()> {
     if key1 != key2 {
-        Err(ErrorCode::PublicKeyMismatch.into())
+        Err(error!(ErrorCode::PublicKeyMismatch))
     } else {
         Ok(())
     }
@@ -172,18 +172,18 @@ pub fn assert_keys_equal(key1: Pubkey, key2: Pubkey) -> ProgramResult {
 
 pub fn assert_initialized<T: Pack + IsInitialized>(
     account_info: &AccountInfo,
-) -> Result<T, ProgramError> {
+) -> Result<T> {
     let account: T = T::unpack_unchecked(&account_info.data.borrow())?;
     if !account.is_initialized() {
-        Err(ErrorCode::UninitializedAccount.into())
+        Err(error!(ErrorCode::UninitializedAccount))
     } else {
         Ok(account)
     }
 }
 
-pub fn assert_owned_by(account: &AccountInfo, owner: &Pubkey) -> ProgramResult {
+pub fn assert_owned_by(account: &AccountInfo, owner: &Pubkey) -> Result<()> {
     if account.owner != owner {
-        Err(ErrorCode::IncorrectOwner.into())
+        Err(error!(ErrorCode::IncorrectOwner))
     } else {
         Ok(())
     }
@@ -199,13 +199,13 @@ pub fn pay_auction_house_fees<'a>(
     signer_seeds: &[&[u8]],
     size: u64,
     is_native: bool,
-) -> Result<u64, ProgramError> {
+) -> Result<u64> {
     let fees = auction_house.seller_fee_basis_points;
     let total_fee = (fees as u128)
         .checked_mul(size as u128)
-        .ok_or(ErrorCode::NumericalOverflow)?
+        .ok_or(error!(ErrorCode::NumericalOverflow))?
         .checked_div(10000)
-        .ok_or(ErrorCode::NumericalOverflow)? as u64;
+        .ok_or(error!(ErrorCode::NumericalOverflow))? as u64;
     if !is_native {
         invoke_signed(
             &spl_token::instruction::transfer(
@@ -253,7 +253,7 @@ pub fn create_program_token_account_if_not_present<'a>(
     signer_seeds: &[&[u8]],
     fee_seeds: &[&[u8]],
     is_native: bool,
-) -> ProgramResult {
+) -> Result<()> {
     if !is_native && payment_account.data_is_empty() {
         create_or_allocate_account_raw(
             *token_program.key,
@@ -303,30 +303,30 @@ pub fn pay_creator_fees<'a>(
     fee_payer_seeds: &[&[u8]],
     size: u64,
     is_native: bool,
-) -> Result<u64, ProgramError> {
+) -> Result<u64> {
     let metadata = Metadata::from_account_info(metadata_info)?;
     let fees = metadata.data.seller_fee_basis_points;
     let total_fee = (fees as u128)
         .checked_mul(size as u128)
-        .ok_or(ErrorCode::NumericalOverflow)?
+        .ok_or(error!(ErrorCode::NumericalOverflow))?
         .checked_div(10000)
-        .ok_or(ErrorCode::NumericalOverflow)? as u64;
+        .ok_or(error!(ErrorCode::NumericalOverflow))? as u64;
     let mut remaining_fee = total_fee;
     let remaining_size = size
         .checked_sub(total_fee)
-        .ok_or(ErrorCode::NumericalOverflow)?;
+        .ok_or(error!(ErrorCode::NumericalOverflow))?;
     match metadata.data.creators {
         Some(creators) => {
             for creator in creators {
                 let pct = creator.share as u128;
                 let creator_fee = pct
                     .checked_mul(total_fee as u128)
-                    .ok_or(ErrorCode::NumericalOverflow)?
+                    .ok_or(error!(ErrorCode::NumericalOverflow))?
                     .checked_div(100)
-                    .ok_or(ErrorCode::NumericalOverflow)? as u64;
+                    .ok_or(error!(ErrorCode::NumericalOverflow))? as u64;
                 remaining_fee = remaining_fee
                     .checked_sub(creator_fee)
-                    .ok_or(ErrorCode::NumericalOverflow)?;
+                    .ok_or(error!(ErrorCode::NumericalOverflow))?;
                 let current_creator_info = next_account_info(remaining_accounts)?;
                 assert_keys_equal(creator.address, *current_creator_info.key)?;
                 if !is_native {
@@ -392,13 +392,13 @@ pub fn pay_creator_fees<'a>(
     // Any dust is returned to the party posting the NFT
     Ok(remaining_size
         .checked_add(remaining_fee)
-        .ok_or(ErrorCode::NumericalOverflow)?)
+        .ok_or(error!(ErrorCode::NumericalOverflow))?)
 }
 
 /// Cheap method to just grab mint Pubkey from token account, instead of deserializing entire thing
 pub fn get_mint_from_token_account(
     token_account_info: &AccountInfo,
-) -> Result<Pubkey, ProgramError> {
+) -> Result<Pubkey> {
     // TokeAccount layout:   mint(32), owner(32), ...
     let data = token_account_info.try_borrow_data()?;
     let mint_data = array_ref![data, 0, 32];
@@ -408,7 +408,7 @@ pub fn get_mint_from_token_account(
 /// Cheap method to just grab delegate Pubkey from token account, instead of deserializing entire thing
 pub fn get_delegate_from_token_account(
     token_account_info: &AccountInfo,
-) -> Result<Option<Pubkey>, ProgramError> {
+) -> Result<Option<Pubkey>> {
     // TokeAccount layout:   mint(32), owner(32), ...
     let data = token_account_info.try_borrow_data()?;
     let key_data = array_ref![data, 76, 32];
@@ -432,7 +432,7 @@ pub fn create_or_allocate_account_raw<'a>(
     size: usize,
     signer_seeds: &[&[u8]],
     new_acct_seeds: &[&[u8]],
-) -> Result<(), ProgramError> {
+) -> Result<()> {
     let rent = &Rent::from_account_info(rent_sysvar_info)?;
     let required_lamports = rent
         .minimum_balance(size)
@@ -484,10 +484,10 @@ pub fn assert_derivation(
     program_id: &Pubkey,
     account: &AccountInfo,
     path: &[&[u8]],
-) -> Result<u8, ProgramError> {
+) -> Result<u8> {
     let (key, bump) = Pubkey::find_program_address(&path, program_id);
     if key != *account.key {
-        return Err(ErrorCode::DerivedKeyInvalid.into());
+        return Err(error!(ErrorCode::DerivedKeyInvalid));
     }
     Ok(bump)
 }

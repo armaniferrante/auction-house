@@ -34,7 +34,7 @@ pub mod auction_house {
         seller_fee_basis_points: u16,
         requires_sign_off: bool,
         can_change_sale_price: bool,
-    ) -> ProgramResult {
+    ) -> Result<()> {
         let treasury_mint = &ctx.accounts.treasury_mint;
         let payer = &ctx.accounts.payer;
         let authority = &ctx.accounts.authority;
@@ -55,7 +55,7 @@ pub mod auction_house {
         auction_house.fee_payer_bump = *ctx.bumps.get("auction_house_fee_account").unwrap();
 
         if seller_fee_basis_points > 10000 {
-            return Err(ErrorCode::InvalidBasisPoints.into());
+            return Err(error!(ErrorCode::InvalidBasisPoints));
         }
         auction_house.seller_fee_basis_points = seller_fee_basis_points;
         auction_house.requires_sign_off = requires_sign_off;
@@ -125,7 +125,7 @@ pub mod auction_house {
     pub fn deposit<'info>(
         ctx: Context<'_, '_, '_, 'info, Deposit<'info>>,
         amount: u64,
-    ) -> ProgramResult {
+    ) -> Result<()> {
         let wallet = &ctx.accounts.wallet;
         let payment_account = &ctx.accounts.payment_account;
         let transfer_authority = &ctx.accounts.transfer_authority;
@@ -220,7 +220,7 @@ pub mod auction_house {
     pub fn withdraw<'info>(
         ctx: Context<'_, '_, '_, 'info, Withdraw<'info>>,
         amount: u64,
-    ) -> ProgramResult {
+    ) -> Result<()> {
         let wallet = &ctx.accounts.wallet;
         let receipt_account = &ctx.accounts.receipt_account;
         let escrow_payment_account = &ctx.accounts.escrow_payment_account;
@@ -252,7 +252,7 @@ pub mod auction_house {
         let wallet_key = wallet.key();
 
         if !wallet.to_account_info().is_signer && !authority.to_account_info().is_signer {
-            return Err(ErrorCode::NoValidSignerPresent.into());
+            return Err(error!(ErrorCode::NoValidSignerPresent));
         }
 
         let escrow_payment_bump = *ctx.bumps.get("escrow_payment_account").unwrap();
@@ -297,7 +297,7 @@ pub mod auction_house {
 
             // make sure you cant get rugged
             if rec_acct.delegate.is_some() {
-                return Err(ErrorCode::BuyerATACannotHaveDelegate.into());
+                return Err(error!(ErrorCode::BuyerATACannotHaveDelegate));
             }
 
             assert_is_ata(receipt_account, &wallet.key(), &treasury_mint.key())?;
@@ -342,7 +342,7 @@ pub mod auction_house {
         ctx: Context<'_, '_, '_, 'info, Sell<'info>>,
         buyer_price: u64,
         token_size: u64,
-    ) -> ProgramResult {
+    ) -> Result<()> {
         let wallet = &ctx.accounts.wallet;
         let token_account = &ctx.accounts.token_account;
         let metadata = &ctx.accounts.metadata;
@@ -358,15 +358,15 @@ pub mod auction_house {
 
         if !wallet.to_account_info().is_signer {
             if buyer_price == 0 {
-                return Err(ErrorCode::SaleRequiresSigner.into());
+                return Err(error!(ErrorCode::SaleRequiresSigner));
             } else {
                 if free_seller_trade_state.data_is_empty() {
-                    return Err(ErrorCode::SaleRequiresSigner.into());
+                    return Err(error!(ErrorCode::SaleRequiresSigner));
                 } else if !free_seller_trade_state.data_is_empty()
                     && (!authority.to_account_info().is_signer
                         || !auction_house.can_change_sale_price)
                 {
-                    return Err(ErrorCode::SaleRequiresSigner.into());
+                    return Err(error!(ErrorCode::SaleRequiresSigner));
                 }
             }
         }
@@ -397,7 +397,7 @@ pub mod auction_house {
         assert_metadata_valid(metadata, token_account)?;
 
         if token_size > token_account.amount {
-            return Err(ErrorCode::InvalidTokenAmount.into());
+            return Err(error!(ErrorCode::InvalidTokenAmount));
         }
 
         if wallet.is_signer {
@@ -460,7 +460,7 @@ pub mod auction_house {
         ctx: Context<'_, '_, '_, 'info, Cancel<'info>>,
         _buyer_price: u64,
         _token_size: u64,
-    ) -> ProgramResult {
+    ) -> Result<()> {
         let wallet = &ctx.accounts.wallet;
         let token_account = &ctx.accounts.token_account;
         let authority = &ctx.accounts.authority;
@@ -470,7 +470,7 @@ pub mod auction_house {
         let token_program = &ctx.accounts.token_program;
 
         if !wallet.to_account_info().is_signer && !authority.to_account_info().is_signer {
-            return Err(ErrorCode::NoValidSignerPresent.into());
+            return Err(error!(ErrorCode::NoValidSignerPresent));
         }
 
         let auction_house_key = auction_house.key();
@@ -495,7 +495,7 @@ pub mod auction_house {
         **fee_payer.lamports.borrow_mut() = fee_payer
             .lamports()
             .checked_add(curr_lamp)
-            .ok_or(ErrorCode::NumericalOverflow)?;
+            .ok_or(error!(ErrorCode::NumericalOverflow))?;
 
         if token_account.owner == wallet.key() && wallet.is_signer {
             invoke_signed(
@@ -522,7 +522,7 @@ pub mod auction_house {
         ctx: Context<'_, '_, '_, 'info, Buy<'info>>,
         buyer_price: u64,
         token_size: u64,
-    ) -> ProgramResult {
+    ) -> Result<()> {
         let wallet = &ctx.accounts.wallet;
         let payment_account = &ctx.accounts.payment_account;
         let transfer_authority = &ctx.accounts.transfer_authority;
@@ -587,7 +587,7 @@ pub mod auction_house {
             if escrow_payment_account.lamports() < buyer_price {
                 let diff = buyer_price
                     .checked_sub(escrow_payment_account.lamports())
-                    .ok_or(ErrorCode::NumericalOverflow)?;
+                    .ok_or(error!(ErrorCode::NumericalOverflow))?;
                 invoke_signed(
                     &system_instruction::transfer(
                         &payment_account.key(),
@@ -609,7 +609,7 @@ pub mod auction_house {
             if escrow_payment_loaded.amount < buyer_price {
                 let diff = buyer_price
                     .checked_sub(escrow_payment_loaded.amount)
-                    .ok_or(ErrorCode::NumericalOverflow)?;
+                    .ok_or(error!(ErrorCode::NumericalOverflow))?;
                 invoke(
                     &spl_token::instruction::transfer(
                         &token_program.key(),
@@ -667,7 +667,7 @@ pub mod auction_house {
         ctx: Context<'_, '_, '_, 'info, ExecuteSale<'info>>,
         buyer_price: u64,
         token_size: u64,
-    ) -> ProgramResult {
+    ) -> Result<()> {
         let buyer = &ctx.accounts.buyer;
         let seller = &ctx.accounts.seller;
         let token_account = &ctx.accounts.token_account;
@@ -708,7 +708,7 @@ pub mod auction_house {
         let is_native = treasury_mint.key() == spl_token::native_mint::id();
 
         if buyer_price == 0 && !authority_clone.is_signer && !seller.is_signer {
-            return Err(ErrorCode::CannotMatchFreeSalesWithoutAuctionHouseOrSellerSignoff.into());
+            return Err(error!(ErrorCode::CannotMatchFreeSalesWithoutAuctionHouseOrSellerSignoff));
         }
 
         let token_account_mint = get_mint_from_token_account(&token_account_clone)?;
@@ -719,11 +719,11 @@ pub mod auction_house {
             assert_keys_equal(program_as_signer.key(), d)?;
         } else {
             msg!("No delegate detected on token account.");
-            return Err(ErrorCode::BothPartiesNeedToAgreeToSale.into());
+            return Err(error!(ErrorCode::BothPartiesNeedToAgreeToSale));
         }
 
         if buyer_trade_state.data_is_empty() || seller_trade_state.data_is_empty() {
-            return Err(ErrorCode::BothPartiesNeedToAgreeToSale.into());
+            return Err(error!(ErrorCode::BothPartiesNeedToAgreeToSale));
         }
 
         let auction_house_key = auction_house.key();
@@ -762,7 +762,7 @@ pub mod auction_house {
         )?;
 
         if metadata.data_is_empty() {
-            return Err(ErrorCode::MetadataDoesntExist.into());
+            return Err(error!(ErrorCode::MetadataDoesntExist));
         }
 
         let auction_house_key = auction_house.key();
@@ -819,7 +819,7 @@ pub mod auction_house {
 
         let buyer_leftover_after_royalties_and_house_fee = buyer_leftover_after_royalties
             .checked_sub(auction_house_fee_paid)
-            .ok_or(ErrorCode::NumericalOverflow)?;
+            .ok_or(error!(ErrorCode::NumericalOverflow))?;
 
         if !is_native {
             if seller_payment_receipt_account.data_is_empty() {
@@ -844,7 +844,7 @@ pub mod auction_house {
 
             // make sure you cant get rugged
             if seller_rec_acct.delegate.is_some() {
-                return Err(ErrorCode::SellerATACannotHaveDelegate.into());
+                return Err(error!(ErrorCode::SellerATACannotHaveDelegate));
             }
 
             invoke_signed(
@@ -899,7 +899,7 @@ pub mod auction_house {
 
         // make sure you cant get rugged
         if buyer_rec_acct.delegate.is_some() {
-            return Err(ErrorCode::BuyerATACannotHaveDelegate.into());
+            return Err(error!(ErrorCode::BuyerATACannotHaveDelegate));
         }
 
         let program_as_signer_seeds = [
@@ -932,7 +932,7 @@ pub mod auction_house {
         **fee_payer.lamports.borrow_mut() = fee_payer
             .lamports()
             .checked_add(curr_seller_lamp)
-            .ok_or(ErrorCode::NumericalOverflow)?;
+            .ok_or(error!(ErrorCode::NumericalOverflow))?;
 
         let curr_buyer_lamp = buyer_trade_state.lamports();
         **buyer_trade_state.lamports.borrow_mut() = 0;
@@ -940,7 +940,7 @@ pub mod auction_house {
         **fee_payer.lamports.borrow_mut() = fee_payer
             .lamports()
             .checked_add(curr_buyer_lamp)
-            .ok_or(ErrorCode::NumericalOverflow)?;
+            .ok_or(error!(ErrorCode::NumericalOverflow))?;
 
         if free_trade_state.lamports() > 0 {
             let curr_buyer_lamp = free_trade_state.lamports();
@@ -949,7 +949,7 @@ pub mod auction_house {
             **fee_payer.lamports.borrow_mut() = fee_payer
                 .lamports()
                 .checked_add(curr_buyer_lamp)
-                .ok_or(ErrorCode::NumericalOverflow)?;
+                .ok_or(error!(ErrorCode::NumericalOverflow))?;
         }
         Ok(())
     }
@@ -957,7 +957,7 @@ pub mod auction_house {
     pub fn withdraw_from_fee<'info>(
         ctx: Context<'_, '_, '_, 'info, WithdrawFromFee<'info>>,
         amount: u64,
-    ) -> ProgramResult {
+    ) -> Result<()> {
         let auction_house_fee_account = &ctx.accounts.auction_house_fee_account;
         let fee_withdrawal_destination = &ctx.accounts.fee_withdrawal_destination;
         let auction_house = &ctx.accounts.auction_house;
@@ -991,7 +991,7 @@ pub mod auction_house {
     pub fn withdraw_from_treasury<'info>(
         ctx: Context<'_, '_, '_, 'info, WithdrawFromTreasury<'info>>,
         amount: u64,
-    ) -> ProgramResult {
+    ) -> Result<()> {
         let treasury_mint = &ctx.accounts.treasury_mint;
         let treasury_withdrawal_destination = &ctx.accounts.treasury_withdrawal_destination;
         let auction_house_treasury = &ctx.accounts.auction_house_treasury;
@@ -1056,7 +1056,7 @@ pub mod auction_house {
         seller_fee_basis_points: Option<u16>,
         requires_sign_off: Option<bool>,
         can_change_sale_price: Option<bool>,
-    ) -> ProgramResult {
+    ) -> Result<()> {
         let treasury_mint = &ctx.accounts.treasury_mint;
         let payer = &ctx.accounts.payer;
         let new_authority = &ctx.accounts.new_authority;
@@ -1073,7 +1073,7 @@ pub mod auction_house {
 
         if let Some(sfbp) = seller_fee_basis_points {
             if sfbp > 10000 {
-                return Err(ErrorCode::InvalidBasisPoints.into());
+                return Err(error!(ErrorCode::InvalidBasisPoints));
             }
 
             auction_house.seller_fee_basis_points = sfbp;
@@ -1702,7 +1702,7 @@ pub struct AuctionHouse {
 
 pub const TRADE_STATE_SIZE: usize = 1;
 
-#[error]
+#[error_codes]
 pub enum ErrorCode {
     #[msg("PublicKeyMismatch")]
     PublicKeyMismatch,
