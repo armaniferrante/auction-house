@@ -55,7 +55,7 @@ pub mod auction_house {
         auction_house.fee_payer_bump = *ctx.bumps.get("auction_house_fee_account").unwrap();
 
         if seller_fee_basis_points > 10000 {
-            return Err(error!(ErrorCode::InvalidBasisPoints));
+            return err!(ErrorCode::InvalidBasisPoints);
         }
         auction_house.seller_fee_basis_points = seller_fee_basis_points;
         auction_house.requires_sign_off = requires_sign_off;
@@ -252,7 +252,7 @@ pub mod auction_house {
         let wallet_key = wallet.key();
 
         if !wallet.to_account_info().is_signer && !authority.to_account_info().is_signer {
-            return Err(error!(ErrorCode::NoValidSignerPresent));
+            return err!(ErrorCode::NoValidSignerPresent);
         }
 
         let escrow_payment_bump = *ctx.bumps.get("escrow_payment_account").unwrap();
@@ -297,7 +297,7 @@ pub mod auction_house {
 
             // make sure you cant get rugged
             if rec_acct.delegate.is_some() {
-                return Err(error!(ErrorCode::BuyerATACannotHaveDelegate));
+                return err!(ErrorCode::BuyerATACannotHaveDelegate);
             }
 
             assert_is_ata(receipt_account, &wallet.key(), &treasury_mint.key())?;
@@ -358,15 +358,15 @@ pub mod auction_house {
 
         if !wallet.to_account_info().is_signer {
             if buyer_price == 0 {
-                return Err(error!(ErrorCode::SaleRequiresSigner));
+                return err!(ErrorCode::SaleRequiresSigner);
             } else {
                 if free_seller_trade_state.data_is_empty() {
-                    return Err(error!(ErrorCode::SaleRequiresSigner));
+                    return err!(ErrorCode::SaleRequiresSigner);
                 } else if !free_seller_trade_state.data_is_empty()
                     && (!authority.to_account_info().is_signer
                         || !auction_house.can_change_sale_price)
                 {
-                    return Err(error!(ErrorCode::SaleRequiresSigner));
+                    return err!(ErrorCode::SaleRequiresSigner);
                 }
             }
         }
@@ -397,7 +397,7 @@ pub mod auction_house {
         assert_metadata_valid(metadata, token_account)?;
 
         if token_size > token_account.amount {
-            return Err(error!(ErrorCode::InvalidTokenAmount));
+            return err!(ErrorCode::InvalidTokenAmount);
         }
 
         if wallet.is_signer {
@@ -470,7 +470,7 @@ pub mod auction_house {
         let token_program = &ctx.accounts.token_program;
 
         if !wallet.to_account_info().is_signer && !authority.to_account_info().is_signer {
-            return Err(error!(ErrorCode::NoValidSignerPresent));
+            return err!(ErrorCode::NoValidSignerPresent);
         }
 
         let auction_house_key = auction_house.key();
@@ -708,9 +708,7 @@ pub mod auction_house {
         let is_native = treasury_mint.key() == spl_token::native_mint::id();
 
         if buyer_price == 0 && !authority_clone.is_signer && !seller.is_signer {
-            return Err(error!(
-                ErrorCode::CannotMatchFreeSalesWithoutAuctionHouseOrSellerSignoff
-            ));
+            return err!(ErrorCode::CannotMatchFreeSalesWithoutAuctionHouseOrSellerSignoff);
         }
 
         let token_account_mint = get_mint_from_token_account(&token_account_clone)?;
@@ -721,11 +719,11 @@ pub mod auction_house {
             assert_keys_equal(program_as_signer.key(), d)?;
         } else {
             msg!("No delegate detected on token account.");
-            return Err(error!(ErrorCode::BothPartiesNeedToAgreeToSale));
+            return err!(ErrorCode::BothPartiesNeedToAgreeToSale);
         }
 
         if buyer_trade_state.data_is_empty() || seller_trade_state.data_is_empty() {
-            return Err(error!(ErrorCode::BothPartiesNeedToAgreeToSale));
+            return err!(ErrorCode::BothPartiesNeedToAgreeToSale);
         }
 
         let auction_house_key = auction_house.key();
@@ -764,7 +762,7 @@ pub mod auction_house {
         )?;
 
         if metadata.data_is_empty() {
-            return Err(error!(ErrorCode::MetadataDoesntExist));
+            return err!(ErrorCode::MetadataDoesntExist);
         }
 
         let auction_house_key = auction_house.key();
@@ -846,7 +844,7 @@ pub mod auction_house {
 
             // make sure you cant get rugged
             if seller_rec_acct.delegate.is_some() {
-                return Err(error!(ErrorCode::SellerATACannotHaveDelegate));
+                return err!(ErrorCode::SellerATACannotHaveDelegate);
             }
 
             invoke_signed(
@@ -901,7 +899,7 @@ pub mod auction_house {
 
         // make sure you cant get rugged
         if buyer_rec_acct.delegate.is_some() {
-            return Err(error!(ErrorCode::BuyerATACannotHaveDelegate));
+            return err!(ErrorCode::BuyerATACannotHaveDelegate);
         }
 
         let program_as_signer_seeds = [
@@ -1075,7 +1073,7 @@ pub mod auction_house {
 
         if let Some(sfbp) = seller_fee_basis_points {
             if sfbp > 10000 {
-                return Err(error!(ErrorCode::InvalidBasisPoints));
+                return err!(ErrorCode::InvalidBasisPoints);
             }
 
             auction_house.seller_fee_basis_points = sfbp;
