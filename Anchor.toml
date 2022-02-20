@@ -1,7 +1,6 @@
 [features]
 seeds = true
 
-
 [programs.localnet]
 auction_house = "hausS13jsjafwWwGqZTUQRmWyvyxn9EQpqMwV1PBBmk"
 
