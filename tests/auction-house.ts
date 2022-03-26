@@ -324,8 +324,14 @@ describe("auction-house", () => {
       [PREFIX, auctionHouse.toBuffer(), buyerWallet.publicKey.toBuffer()],
       AUCTION_HOUSE_PROGRAM_ID
     );
-    const [auctionHouseTreasury] = await PublicKey.findProgramAddress([PREFIX, auctionHouse.toBuffer(), TREASURY], AUCTION_HOUSE_PROGRAM_ID);
-    const airdropSig = await authorityClient.provider.connection.requestAirdrop(auctionHouseTreasury, 890880);
+    const [auctionHouseTreasury] = await PublicKey.findProgramAddress(
+      [PREFIX, auctionHouse.toBuffer(), TREASURY],
+      AUCTION_HOUSE_PROGRAM_ID
+    );
+    const airdropSig = await authorityClient.provider.connection.requestAirdrop(
+      auctionHouseTreasury,
+      890880
+    );
     await authorityClient.provider.connection.confirmTransaction(airdropSig);
     // Before state.
     const beforeEscrowState =
