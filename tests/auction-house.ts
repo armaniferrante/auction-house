@@ -41,6 +41,7 @@ describe("auction-house", () => {
   // Seeds constants.
   const PREFIX = Buffer.from("auction_house");
   const FEE_PAYER = Buffer.from("fee_payer");
+  const TREASURY = Buffer.from("treasury");
 
   // Constant accounts.
   // @ts-ignore
@@ -318,11 +319,20 @@ describe("auction-house", () => {
     console.log("buy:", txSig);
   });
 
-  it("Executes a trades", async () => {
+  it("Executes a trade", async () => {
     const [buyerEscrow] = await PublicKey.findProgramAddress(
       [PREFIX, auctionHouse.toBuffer(), buyerWallet.publicKey.toBuffer()],
       AUCTION_HOUSE_PROGRAM_ID
     );
+    const [auctionHouseTreasury] = await PublicKey.findProgramAddress(
+      [PREFIX, auctionHouse.toBuffer(), TREASURY],
+      AUCTION_HOUSE_PROGRAM_ID
+    );
+    const airdropSig = await authorityClient.provider.connection.requestAirdrop(
+      auctionHouseTreasury,
+      890880
+    );
+    await authorityClient.provider.connection.confirmTransaction(airdropSig);
     // Before state.
     const beforeEscrowState =
       await authorityClient.provider.connection.getAccountInfo(buyerEscrow);
