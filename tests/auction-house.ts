@@ -104,7 +104,7 @@ describe("auction-house", () => {
         mintAuthority: getProvider().wallet.publicKey,
       }
     );
-    await getProvider().send(tx);
+    await getProvider().sendAndConfirm(tx);
   });
 
   it("Creates token accounts for the NFT", async () => {
@@ -187,7 +187,7 @@ describe("auction-house", () => {
         lamports: 100 * 10 ** 9,
       })
     );
-    const txSig = await getProvider().send(tx);
+    const txSig = await getProvider().sendAndConfirm(tx);
     console.log("fund buyer:", txSig);
   });
 
@@ -424,7 +424,7 @@ describe("auction-house", () => {
         .instruction()
     );
 
-    const txSig = await authorityClient.provider.send(tx);
+    const txSig = await authorityClient.provider.sendAndConfirm(tx);
     console.log("updateAuctionHouse:", txSig);
 
     const newAh = await authorityClient.account.auctionHouse.fetch(
