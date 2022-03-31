@@ -1,7 +1,7 @@
 import * as assert from "assert";
 //import * as anchor from "@project-serum/anchor/ts";
 import * as anchor from "../../../ts";
-import { Provider, Program, Wallet, BN, getProvider } from "../../../ts";
+import { AnchorProvider, Program, Wallet, BN, getProvider } from "../../../ts";
 import {
   Transaction,
   Keypair,
@@ -30,7 +30,7 @@ const NATIVE_SOL_MINT = new PublicKey(
 );
 
 describe("auction-house", () => {
-  anchor.setProvider(Provider.env());
+  anchor.setProvider(AnchorProvider.env());
 
   // Clients.
   let authorityClient: Program<AuctionHouse>; // Reprents the exchange authority.
@@ -134,19 +134,19 @@ describe("auction-house", () => {
     sellerClient = new Program<AuctionHouse>(
       IDL,
       AUCTION_HOUSE_PROGRAM_ID,
-      new Provider(
+      new AnchorProvider(
         getProvider().connection,
         new Wallet(sellerWallet),
-        Provider.defaultOptions()
+        AnchorProvider.defaultOptions()
       )
     );
     buyerClient = new Program<AuctionHouse>(
       IDL,
       AUCTION_HOUSE_PROGRAM_ID,
-      new Provider(
+      new AnchorProvider(
         getProvider().connection,
         new Wallet(buyerWallet),
-        Provider.defaultOptions()
+        AnchorProvider.defaultOptions()
       )
     );
   });
