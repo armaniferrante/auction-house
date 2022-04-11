@@ -1,7 +1,7 @@
 import * as assert from "assert";
 //import * as anchor from "@project-serum/anchor/ts";
 import * as anchor from "../../../ts";
-import { Provider, Program, Wallet, BN, getProvider } from "../../../ts";
+import { AnchorProvider, Program, Wallet, BN, getProvider } from "../../../ts";
 import {
   Transaction,
   Keypair,
@@ -30,7 +30,7 @@ const NATIVE_SOL_MINT = new PublicKey(
 );
 
 describe("auction-house", () => {
-  anchor.setProvider(Provider.env());
+  anchor.setProvider(AnchorProvider.env());
 
   // Clients.
   let authorityClient: Program<AuctionHouse>; // Reprents the exchange authority.
@@ -104,7 +104,7 @@ describe("auction-house", () => {
         mintAuthority: getProvider().wallet.publicKey,
       }
     );
-    await getProvider().send(tx);
+    await getProvider().sendAndConfirm(tx);
   });
 
   it("Creates token accounts for the NFT", async () => {
@@ -134,19 +134,19 @@ describe("auction-house", () => {
     sellerClient = new Program<AuctionHouse>(
       IDL,
       AUCTION_HOUSE_PROGRAM_ID,
-      new Provider(
+      new AnchorProvider(
         getProvider().connection,
         new Wallet(sellerWallet),
-        Provider.defaultOptions()
+        AnchorProvider.defaultOptions()
       )
     );
     buyerClient = new Program<AuctionHouse>(
       IDL,
       AUCTION_HOUSE_PROGRAM_ID,
-      new Provider(
+      new AnchorProvider(
         getProvider().connection,
         new Wallet(buyerWallet),
-        Provider.defaultOptions()
+        AnchorProvider.defaultOptions()
       )
     );
   });
@@ -187,7 +187,7 @@ describe("auction-house", () => {
         lamports: 100 * 10 ** 9,
       })
     );
-    const txSig = await getProvider().send(tx);
+    const txSig = await getProvider().sendAndConfirm(tx);
     console.log("fund buyer:", txSig);
   });
 
@@ -424,7 +424,7 @@ describe("auction-house", () => {
         .instruction()
     );
 
-    const txSig = await authorityClient.provider.send(tx);
+    const txSig = await authorityClient.provider.sendAndConfirm(tx);
     console.log("updateAuctionHouse:", txSig);
 
     const newAh = await authorityClient.account.auctionHouse.fetch(
