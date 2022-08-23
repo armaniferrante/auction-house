@@ -1,7 +1,13 @@
 import * as assert from "assert";
 //import * as anchor from "@project-serum/anchor/ts";
 import * as anchor from "../../../ts/packages/anchor";
-import { AnchorProvider, Program, Wallet, BN, getProvider } from "../../../ts/packages/anchor";
+import {
+  AnchorProvider,
+  Program,
+  Wallet,
+  BN,
+  getProvider,
+} from "../../../ts/packages/anchor";
 import {
   Transaction,
   Keypair,
