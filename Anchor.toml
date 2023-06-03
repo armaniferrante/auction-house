@@ -19,4 +19,4 @@ test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
 
 [[test.genesis]]
 address = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
-program = "./deps/metaplex/rust/target/deploy/metaplex_token_metadata.so"
+program = "./prebuilt-programs/metaplex_token_metadata.so"
