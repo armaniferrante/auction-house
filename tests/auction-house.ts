@@ -1,12 +1,11 @@
 import * as assert from "assert";
-//import * as anchor from "@project-serum/anchor/ts";
-import * as anchor from "../../../ts/packages/anchor";
 import {
   AnchorProvider,
   Program,
   Wallet,
   BN,
   getProvider,
+  setProvider,
 } from "../../../ts/packages/anchor";
 import {
   Transaction,
@@ -17,6 +16,7 @@ import {
 import { u64, Token, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import * as metaplex from "@metaplex/js";
 import { IDL, AuctionHouse } from "../target/types/auction_house";
+
 const MetadataDataData = metaplex.programs.metadata.MetadataDataData;
 const CreateMetadata = metaplex.programs.metadata.CreateMetadata;
 
@@ -36,7 +36,9 @@ const NATIVE_SOL_MINT = new PublicKey(
 );
 
 describe("auction-house", () => {
-  anchor.setProvider(AnchorProvider.env());
+  setProvider(AnchorProvider.env());
+  // @ts-ignore
+  const wallet = getProvider().wallet as Wallet;
 
   // Clients.
   let authorityClient: Program<AuctionHouse>; // Reprents the exchange authority.
@@ -50,9 +52,8 @@ describe("auction-house", () => {
   const TREASURY = Buffer.from("treasury");
 
   // Constant accounts.
-  // @ts-ignore
-  const authorityKeypair = getProvider().wallet.payer;
-  const authority = getProvider().wallet.publicKey;
+  const authorityKeypair = wallet.payer;
+  const authority = wallet.publicKey;
   const feeWithdrawalDestination = authority;
   const treasuryWithdrawalDestination = authority;
   const treasuryWithdrawalDestinationOwner = authority;
@@ -76,9 +77,8 @@ describe("auction-house", () => {
     // Create the mint.
     nftMintClient = await Token.createMint(
       getProvider().connection,
-      // @ts-ignore
-      getProvider().wallet.payer,
-      getProvider().wallet.publicKey,
+      authorityKeypair,
+      authority,
       null,
       6,
       tokenProgram
@@ -95,7 +95,7 @@ describe("auction-house", () => {
     );
     metadata = _metadata;
     const tx = new CreateMetadata(
-      { feePayer: getProvider().wallet.publicKey },
+      { feePayer: authority },
       {
         metadata,
         metadataData: new MetadataDataData({
@@ -105,9 +105,9 @@ describe("auction-house", () => {
           sellerFeeBasisPoints: 1,
           creators: null,
         }),
-        updateAuthority: getProvider().wallet.publicKey,
+        updateAuthority: authority,
         mint: nftMintClient.publicKey,
-        mintAuthority: getProvider().wallet.publicKey,
+        mintAuthority: authority,
       }
     );
     await getProvider().sendAndConfirm(tx);
@@ -123,12 +123,7 @@ describe("auction-house", () => {
     );
 
     // Initialize the seller's account with a single token.
-    await nftMintClient.mintTo(
-      sellerTokenAccount,
-      getProvider().wallet.publicKey,
-      [],
-      1
-    );
+    await nftMintClient.mintTo(sellerTokenAccount, authority, [], 1);
   });
 
   it("Creates auction house program clients representing the buyer and seller", async () => {
