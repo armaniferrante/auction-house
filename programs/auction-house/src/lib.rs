@@ -12,6 +12,7 @@ use {
     },
     anchor_spl::{
         associated_token::AssociatedToken,
+        metadata::mpl_token_metadata,
         token::{Mint, Token, TokenAccount},
     },
     spl_token::instruction::{approve, revoke},
@@ -102,7 +103,6 @@ pub mod auction_house {
                     associated_token_program.to_account_info(),
                     token_program.to_account_info(),
                     system_program.to_account_info(),
-                    rent.to_account_info(),
                     &[],
                 )?;
             }
@@ -231,7 +231,6 @@ pub mod auction_house {
         let system_program = &ctx.accounts.system_program;
         let token_program = &ctx.accounts.token_program;
         let associated_token_program = &ctx.accounts.associated_token_program;
-        let rent = &ctx.accounts.rent;
 
         let auction_house_key = auction_house.key();
         let seeds = [
@@ -284,7 +283,6 @@ pub mod auction_house {
                     associated_token_program.to_account_info(),
                     token_program.to_account_info(),
                     system_program.to_account_info(),
-                    rent.to_account_info(),
                     &fee_seeds,
                 )?;
             }
@@ -688,33 +686,24 @@ pub mod auction_house {
         let system_program = &ctx.accounts.system_program;
         let associated_token_program = &ctx.accounts.associated_token_program;
         let program_as_signer = &ctx.accounts.program_as_signer;
-        let rent = &ctx.accounts.rent;
 
-        let metadata_clone = metadata.to_account_info();
-        let escrow_clone = escrow_payment_account.to_account_info();
         let auction_house_clone = auction_house.to_account_info();
         let ata_clone = associated_token_program.to_account_info();
         let token_clone = token_program.to_account_info();
-        let sys_clone = system_program.to_account_info();
-        let rent_clone = rent.to_account_info();
-        let treasury_clone = auction_house_treasury.to_account_info();
-        let authority_clone = authority.to_account_info();
-        let buyer_receipt_clone = buyer_receipt_token_account.to_account_info();
-        let token_account_clone = token_account.to_account_info();
 
         let escrow_payment_bump = *ctx.bumps.get("escrow_payment_account").unwrap();
         let program_as_signer_bump = *ctx.bumps.get("program_as_signer").unwrap();
 
         let is_native = treasury_mint.key() == spl_token::native_mint::id();
 
-        if buyer_price == 0 && !authority_clone.is_signer && !seller.is_signer {
+        if buyer_price == 0 && !authority.is_signer && !seller.is_signer {
             return err!(ErrorCode::CannotMatchFreeSalesWithoutAuctionHouseOrSellerSignoff);
         }
 
-        let token_account_mint = get_mint_from_token_account(&token_account_clone)?;
+        let token_account_mint = get_mint_from_token_account(&token_account)?;
 
         assert_keys_equal(token_mint.key(), token_account_mint)?;
-        let delegate = get_delegate_from_token_account(&token_account_clone)?;
+        let delegate = get_delegate_from_token_account(&token_account)?;
         if let Some(d) = delegate {
             assert_keys_equal(program_as_signer.key(), d)?;
         } else {
@@ -752,11 +741,11 @@ pub mod auction_house {
         )?;
 
         assert_derivation(
-            &metaplex_token_metadata::id(),
+            &mpl_token_metadata::ID,
             &metadata.to_account_info(),
             &[
-                metaplex_token_metadata::state::PREFIX.as_bytes(),
-                metaplex_token_metadata::id().as_ref(),
+                b"metadata",
+                mpl_token_metadata::ID.as_ref(),
                 token_account_mint.as_ref(),
             ],
         )?;
@@ -765,7 +754,6 @@ pub mod auction_house {
             return err!(ErrorCode::MetadataDoesntExist);
         }
 
-        let auction_house_key = auction_house.key();
         let wallet_key = buyer.key();
         let escrow_signer_seeds = [
             PREFIX.as_bytes(),
@@ -791,15 +779,14 @@ pub mod auction_house {
 
         let buyer_leftover_after_royalties = pay_creator_fees(
             &mut ctx.remaining_accounts.iter(),
-            &metadata_clone,
-            &escrow_clone,
+            &metadata,
+            &escrow_payment_account,
             &auction_house_clone,
             &fee_payer_clone,
             treasury_mint,
             &ata_clone,
             &token_clone,
-            &sys_clone,
-            &rent_clone,
+            system_program.as_ref(),
             &signer_seeds_for_royalties,
             &fee_payer_seeds,
             buyer_price,
@@ -808,10 +795,10 @@ pub mod auction_house {
 
         let auction_house_fee_paid = pay_auction_house_fees(
             &auction_house,
-            &treasury_clone,
-            &escrow_clone,
+            &auction_house_treasury,
+            &escrow_payment_account,
             &token_clone,
-            &sys_clone,
+            system_program.as_ref(),
             &signer_seeds_for_royalties,
             buyer_price,
             is_native,
@@ -831,7 +818,6 @@ pub mod auction_house {
                     associated_token_program.to_account_info(),
                     token_program.to_account_info(),
                     system_program.to_account_info(),
-                    rent.to_account_info(),
                     &fee_payer_seeds,
                 )?;
             }
@@ -890,12 +876,15 @@ pub mod auction_house {
                 associated_token_program.to_account_info(),
                 token_program.to_account_info(),
                 system_program.to_account_info(),
-                rent.to_account_info(),
                 &fee_payer_seeds,
             )?;
         }
 
-        let buyer_rec_acct = assert_is_ata(&buyer_receipt_clone, &buyer.key(), &token_mint.key())?;
+        let buyer_rec_acct = assert_is_ata(
+            &buyer_receipt_token_account,
+            &buyer.key(),
+            &token_mint.key(),
+        )?;
 
         // make sure you cant get rugged
         if buyer_rec_acct.delegate.is_some() {
@@ -919,7 +908,7 @@ pub mod auction_house {
             )?,
             &[
                 token_account.to_account_info(),
-                buyer_receipt_clone,
+                buyer_receipt_token_account.to_account_info(),
                 program_as_signer.to_account_info(),
                 token_clone,
             ],
@@ -1068,7 +1057,7 @@ pub mod auction_house {
         let token_program = &ctx.accounts.token_program;
         let system_program = &ctx.accounts.system_program;
         let associated_token_program = &ctx.accounts.associated_token_program;
-        let rent = &ctx.accounts.rent;
+
         let is_native = treasury_mint.key() == spl_token::native_mint::id();
 
         if let Some(sfbp) = seller_fee_basis_points {
@@ -1100,7 +1089,6 @@ pub mod auction_house {
                     associated_token_program.to_account_info(),
                     token_program.to_account_info(),
                     system_program.to_account_info(),
-                    rent.to_account_info(),
                     &[],
                 )?;
             }
@@ -1259,7 +1247,6 @@ pub struct Withdraw<'info> {
     token_program: Program<'info, Token>,
     system_program: Program<'info, System>,
     associated_token_program: Program<'info, AssociatedToken>,
-    rent: Sysvar<'info, Rent>,
 }
 
 #[derive(Accounts)]
@@ -1569,7 +1556,6 @@ pub struct ExecuteSale<'info> {
     token_program: Program<'info, Token>,
     system_program: Program<'info, System>,
     associated_token_program: Program<'info, AssociatedToken>,
-    rent: Sysvar<'info, Rent>,
 }
 
 #[derive(Accounts)]
@@ -1664,7 +1650,6 @@ pub struct UpdateAuctionHouse<'info> {
     token_program: Program<'info, Token>,
     system_program: Program<'info, System>,
     associated_token_program: Program<'info, AssociatedToken>,
-    rent: Sysvar<'info, Rent>,
 }
 
 pub const AUCTION_HOUSE_SIZE: usize = 8 + //key
