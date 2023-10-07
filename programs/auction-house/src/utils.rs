@@ -9,9 +9,11 @@ use {
             system_instruction,
         },
     },
-    anchor_spl::token::{Mint, Token, TokenAccount},
+    anchor_spl::{
+        metadata::mpl_token_metadata,
+        token::{Mint, Token, TokenAccount},
+    },
     arrayref::array_ref,
-    metaplex_token_metadata::state::Metadata,
     spl_associated_token_account::get_associated_token_address,
     spl_token::{instruction::initialize_account2, state::Account},
     std::{convert::TryInto, slice::Iter},
@@ -32,7 +34,6 @@ pub fn make_ata<'a>(
     ata_program: AccountInfo<'a>,
     token_program: AccountInfo<'a>,
     system_program: AccountInfo<'a>,
-    rent: AccountInfo<'a>,
     fee_payer_seeds: &[&[u8]],
 ) -> Result<()> {
     let seeds: &[&[&[u8]]];
@@ -57,7 +58,6 @@ pub fn make_ata<'a>(
             fee_payer,
             ata_program,
             system_program,
-            rent,
             token_program,
         ],
         seeds,
@@ -71,11 +71,11 @@ pub fn assert_metadata_valid<'a>(
     token_account: &anchor_lang::accounts::account::Account<'a, TokenAccount>,
 ) -> Result<()> {
     assert_derivation(
-        &metaplex_token_metadata::id(),
+        &mpl_token_metadata::ID,
         &metadata.to_account_info(),
         &[
-            metaplex_token_metadata::state::PREFIX.as_bytes(),
-            metaplex_token_metadata::id().as_ref(),
+            b"metadata",
+            mpl_token_metadata::ID.as_ref(),
             token_account.mint.as_ref(),
         ],
     )?;
@@ -292,14 +292,14 @@ pub fn pay_creator_fees<'a>(
     ata_program: &AccountInfo<'a>,
     token_program: &AccountInfo<'a>,
     system_program: &AccountInfo<'a>,
-    rent: &AccountInfo<'a>,
     signer_seeds: &[&[u8]],
     fee_payer_seeds: &[&[u8]],
     size: u64,
     is_native: bool,
 ) -> Result<u64> {
-    let metadata = Metadata::from_account_info(metadata_info)?;
-    let fees = metadata.data.seller_fee_basis_points;
+    let metadata =
+        mpl_token_metadata::accounts::Metadata::from_bytes(*metadata_info.data.borrow())?;
+    let fees = metadata.seller_fee_basis_points;
     let total_fee = (fees as u128)
         .checked_mul(size as u128)
         .ok_or(error!(ErrorCode::NumericalOverflow))?
@@ -309,7 +309,7 @@ pub fn pay_creator_fees<'a>(
     let remaining_size = size
         .checked_sub(total_fee)
         .ok_or(error!(ErrorCode::NumericalOverflow))?;
-    match metadata.data.creators {
+    match metadata.creators {
         Some(creators) => {
             for creator in creators {
                 let pct = creator.share as u128;
@@ -334,7 +334,6 @@ pub fn pay_creator_fees<'a>(
                             ata_program.to_account_info(),
                             token_program.to_account_info(),
                             system_program.to_account_info(),
-                            rent.to_account_info(),
                             fee_payer_seeds,
                         )?;
                     }
